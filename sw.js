@@ -1,5 +1,5 @@
-// BUMPED TO V4 TO FORCE BROWSER TO DOWNLOAD NEW HTML
-const CACHE_NAME = 'amys-house-v4'; 
+// BUMPED TO V5 to force GitHub Pages to serve the new app.js
+const CACHE_NAME = 'amys-house-v5'; 
 const ASSETS = [
   '/',
   '/index.html',

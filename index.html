@@ -30,22 +30,26 @@
         </div>
     </header>
 
-    <!-- Authentication Screen -->
+    <!-- Simple Workspace Login Screen -->
     <main id="auth-section" class="flex-grow flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100 w-full max-w-md">
-            <h2 class="text-2xl font-bold text-[#0b3b2c] mb-6 text-center">Staff Login</h2>
+            <h2 class="text-2xl font-bold text-[#0b3b2c] mb-6 text-center">System Login</h2>
             
-            <!-- Clean form tag to allow app.js to control submission perfectly -->
             <form id="login-form" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600">Department / Role Email</label>
-                    <input type="email" id="auth-email" required placeholder="e.g. admin@amyshouse.org" class="w-full p-2 border rounded mt-1">
+                    <label class="block text-xs font-semibold text-gray-600">Select Workspace / Role</label>
+                    <select id="auth-username" required class="w-full p-2 border rounded mt-1 bg-gray-50 focus:ring-[#0b3b2c] outline-none">
+                        <option value="">Select your department...</option>
+                        <option value="admin">Admin (Dorothy - All Access)</option>
+                        <option value="store">Amy's House Store (Store Keeper)</option>
+                        <option value="familycare">Family Care Department</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600">Password</label>
-                    <input type="password" id="auth-password" required class="w-full p-2 border rounded mt-1">
+                    <label class="block text-xs font-semibold text-gray-600">Password / PIN</label>
+                    <input type="password" id="auth-password" required class="w-full p-2 border rounded mt-1 focus:ring-[#0b3b2c] outline-none">
                 </div>
-                <button type="submit" id="login-submit-btn" class="w-full bg-[#e85d04] hover:bg-[#d05203] text-white font-bold py-2.5 rounded shadow transition">Sign In</button>
+                <button type="submit" id="login-submit-btn" class="w-full bg-[#e85d04] hover:bg-[#d05203] text-white font-bold py-2.5 rounded shadow transition">Enter Workspace</button>
             </form>
         </div>
     </main>
@@ -60,8 +64,8 @@
                 <table class="w-full text-left text-sm bg-white rounded shadow-sm">
                     <thead class="bg-emerald-100 text-[#0b3b2c] text-xs uppercase">
                         <tr>
-                            <th class="p-2">Login Email (Role)</th>
-                            <th class="p-2">Role Type</th>
+                            <th class="p-2">Workspace ID</th>
+                            <th class="p-2">Access Level</th>
                             <th class="p-2">Current Staff Name</th>
                             <th class="p-2">Action</th>
                         </tr>

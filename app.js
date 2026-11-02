@@ -4,7 +4,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_zm8UZ9x6LlQwr-UdCziZ0g_7DbJvBbq';
 
 document.addEventListener('DOMContentLoaded', async () => {
     
-    // Register Service Worker explicitly for GitHub Pages
+    // Register Service Worker for GitHub Pages
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log("SW Reg Error:", err));
     }
@@ -45,12 +45,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         loginBtn.disabled = true;
 
         try {
-            // Attempt to log in
             const { data, error } = await supabase.auth.signInWithPassword({ email: dummyEmail, password: password });
             
             if (error) throw new Error(error.message);
 
-            // If login works, manually trigger the UI switch
             await transitionToDashboard(data.session);
 
         } catch (err) {
@@ -68,7 +66,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Fetch User Profile
             const { data, error } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
             
-            if (error) throw new Error("Database error reading profile.");
+            // Unmasks real error message if something fails
+            if (error) {
+                console.error("Profile Fetch Error:", error);
+                throw new Error(error.message || "Database error reading profile.");
+            }
             if (!data) throw new Error("Profile is missing from database.");
 
             currentUserProfile = data;
@@ -85,7 +87,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 loadAdminUsersTable();
             }
 
-            // Load application data
             initializeApp();
 
         } catch (err) {
@@ -99,7 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- 4. Logout Logic ---
     logoutBtn.addEventListener('click', async () => {
         await supabase.auth.signOut();
-        window.location.reload(); // Refreshing the page safely resets everything
+        window.location.reload();
     });
 
     // --- 5. Application Functions ---
@@ -216,11 +217,4 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const newName = document.getElementById(`staff-name-${userId}`).value;
                 const { error } = await supabase.from('user_profiles').update({ current_staff_name: newName }).eq('id', userId);
                 if (error) alert("Error updating: " + error.message);
-                else alert("Staff name updated!");
-            });
-        });
-    }
-
-    window.addEventListener('online', () => document.getElementById('sync-status').textContent = 'Online');
-    window.addEventListener('offline', () => document.getElementById('sync-status').textContent = 'Offline (Local)');
-});
+                else alert("Staff name updated!")

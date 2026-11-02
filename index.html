@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MSCP Amy's House Inventory</title>
+    <!-- Favicon and PWA icons -->
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0b3b2c">
-    <link rel="apple-touch-icon" href="logo.png">
+    
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -41,7 +44,7 @@
                     <label class="block text-xs font-semibold text-gray-600">Password</label>
                     <input type="password" id="auth-password" required class="w-full p-2 border rounded mt-1">
                 </div>
-                <button type="submit" class="w-full bg-[#e85d04] hover:bg-[#d05203] text-white font-bold py-2.5 rounded shadow">Sign In</button>
+                <button type="submit" id="login-submit-btn" class="w-full bg-[#e85d04] hover:bg-[#d05203] text-white font-bold py-2.5 rounded shadow transition">Sign In</button>
             </form>
         </div>
     </main>
@@ -49,7 +52,7 @@
     <!-- Main Workspace -->
     <main id="dashboard-section" class="hidden flex-grow max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Admin Panel (Only visible to Admin) -->
+        <!-- Admin Panel -->
         <section id="admin-panel" class="hidden lg:col-span-3 bg-emerald-50 border border-emerald-200 p-4 rounded-xl shadow-sm mb-2">
             <h2 class="text-md font-bold text-[#0b3b2c] mb-3">Admin Controls: Staff Assignment</h2>
             <div class="overflow-x-auto">
@@ -67,7 +70,7 @@
             </div>
         </section>
 
-        <!-- Left: Record Movement -->
+        <!-- Left: Record Movement Form -->
         <section class="bg-white p-5 rounded-xl shadow-sm border border-emerald-900/10 lg:col-span-1 h-fit">
             <h2 class="text-md font-bold text-[#0b3b2c] mb-4 border-b pb-2">Record Movement</h2>
             <form id="movement-form" class="space-y-4">
@@ -133,7 +136,7 @@
                     <input type="text" id="reason" placeholder="e.g. Baking / Event" class="w-full p-2 border rounded text-sm">
                 </div>
 
-                <button type="submit" class="w-full bg-[#0b3b2c] hover:bg-[#07281c] text-white font-medium p-2.5 rounded shadow">Save Entry</button>
+                <button type="submit" class="w-full bg-[#0b3b2c] hover:bg-[#07281c] text-white font-medium p-2.5 rounded shadow transition">Save Entry</button>
             </form>
         </section>
 

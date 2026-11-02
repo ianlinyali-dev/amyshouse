@@ -37,7 +37,7 @@
             </div>
         </div>
 
-        <!-- Navigation Tabs -->
+        <!-- Role-Aware Navigation Tabs -->
         <nav id="app-nav-tabs" style="display: none;" class="bg-[#07281c] border-t border-emerald-900/50 px-4">
             <div class="max-w-7xl mx-auto flex space-x-1 overflow-x-auto text-xs font-medium py-1">
                 <button data-tab="tab-stock" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5 bg-emerald-900 text-white">
@@ -49,18 +49,21 @@
                 <button data-tab="tab-ledger" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
                     📜 Movement Ledger
                 </button>
-                <button data-tab="tab-donations" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                <!-- Restricted Tabs (Hidden from non-admin department users) -->
+                <button id="nav-btn-donations" data-tab="tab-donations" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
                     🎁 Donation Register
                 </button>
-                <button data-tab="tab-donors" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                <button id="nav-btn-donors" data-tab="tab-donors" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
                     🤝 Donors Directory
                 </button>
                 <button data-tab="tab-assets" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
                     💻 Asset Register
                 </button>
+                <!-- Universal Replenishment Tab -->
                 <button data-tab="tab-replenishment" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
                     🛒 Replenishment List
                 </button>
+                <!-- Admin Only Account Management -->
                 <button id="nav-btn-accounts" data-tab="tab-accounts" style="display: none;" class="tab-btn px-3 py-2 rounded text-amber-200 hover:text-amber-100 hover:bg-amber-950 transition flex items-center gap-1.5 font-bold">
                     👥 Staff & Accounts
                 </button>
@@ -119,7 +122,7 @@
         <section id="action-centre-panel" style="display: none;" class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
             <div class="bg-red-50 border-b border-red-200 px-4 py-2.5 flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <span class="animate-pulse text-red-600 font-bold text-sm">⚠️ ACTION CENTRE: Immediate Stock Attention Required</span>
+                    <span class="animate-pulse text-red-600 font-bold text-sm">⚠️ ACTION CENTRE: Immediate Stock & Expiry Attention</span>
                 </div>
                 <span id="action-centre-count" class="text-xs bg-red-600 text-white font-bold px-2 py-0.5 rounded-full">0 Alerts</span>
             </div>
@@ -132,7 +135,7 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Live Stock Balances</h2>
-                        <p class="text-xs text-gray-500">Inventory across Central Store & departments</p>
+                        <p id="stock-scope-desc" class="text-xs text-gray-500">Inventory across Central Store & departments</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button id="btn-open-catalog-edit" class="bg-emerald-50 hover:bg-emerald-100 text-[#0b3b2c] border border-emerald-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
@@ -174,7 +177,7 @@
                                 <th class="p-3">Category</th>
                                 <th class="p-3">Stock Owner</th>
                                 <th class="p-3">Balance</th>
-                                <th class="p-3">Current Unit Cost</th>
+                                <th class="p-3">Unit Cost</th>
                                 <th class="p-3">Status</th>
                                 <th class="p-3 text-right">Perishable?</th>
                             </tr>
@@ -191,9 +194,9 @@
                 <div class="border-b pb-3 flex justify-between items-center">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Record Stock Movement</h2>
-                        <p class="text-xs text-gray-500">Each movement is entered once; balances update automatically.</p>
+                        <p class="text-xs text-gray-500">Every movement is recorded once; balances calculate automatically.</p>
                     </div>
-                    <button type="button" id="btn-open-new-item-modal" class="text-xs bg-[#e85d04] hover:bg-[#d05203] text-white px-2.5 py-1.5 rounded-lg font-medium transition">
+                    <button type="button" id="btn-open-new-item-modal" class="text-xs bg-[#e85d04] hover:bg-[#d05203] text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm transition">
                         + New Item
                     </button>
                 </div>
@@ -224,25 +227,26 @@
                         </div>
                     </div>
 
-                    <!-- Dynamic Donation Details Panel with Auto-Reference Generation -->
+                    <!-- Dynamic Donation Details Panel -->
                     <div id="donation-fields" style="display: none;" class="p-4 bg-orange-50/70 border border-orange-200 rounded-xl space-y-3">
                         <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-orange-900 uppercase tracking-wide">Donation Details</span>
+                            <span class="text-xs font-bold text-orange-900 uppercase tracking-wide">Donation & Donor Identification</span>
                             <button type="button" id="btn-open-new-donor-modal" class="text-xs text-[#e85d04] underline hover:font-bold">+ Add New Donor</button>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">Donor Name</label>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Select Donor</label>
                                 <select id="donor_id" class="w-full p-2 border rounded-lg text-sm bg-white outline-none">
                                     <option value="">Select Donor...</option>
                                 </select>
+                                <div id="donor-quick-info" class="text-[11px] font-mono text-gray-500 mt-1"></div>
                             </div>
                             <div>
                                 <div class="flex justify-between items-center mb-1">
                                     <label class="block text-xs font-semibold text-gray-700">Donation Ref No.</label>
-                                    <span id="auto-ref-tag" class="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.2 rounded font-mono font-bold">Auto</span>
+                                    <span class="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.2 rounded font-mono font-bold">Auto</span>
                                 </div>
-                                <input type="text" id="donation_ref" placeholder="Auto-generated (e.g. AH/DR/001)" class="w-full p-2 border rounded-lg text-sm font-mono font-bold text-[#0b3b2c] bg-white outline-none">
+                                <input type="text" id="donation_ref" placeholder="e.g. AH/DR/001" class="w-full p-2 border rounded-lg text-sm font-mono font-bold text-[#0b3b2c] bg-white outline-none">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">Condition</label>
@@ -328,7 +332,7 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Movement Audit Ledger</h2>
-                        <p class="text-xs text-gray-500">Every entry is permanently tracked, with operator and account identity</p>
+                        <p class="text-xs text-gray-500">Every single transaction entered into the store is permanently tracked.</p>
                     </div>
                     <button id="btn-export-ledger" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto">
                         📥 Export Ledger
@@ -373,7 +377,7 @@
             </div>
         </section>
 
-        <!-- TAB 4: Donation Register -->
+        <!-- TAB 4: Donation Register (Admin Only) -->
         <section id="tab-donations" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -422,16 +426,34 @@
             </div>
         </section>
 
-        <!-- TAB 5: Donors Directory -->
+        <!-- TAB 5: Donors Directory (Admin Only, Sorted by Last Active Donation) -->
         <section id="tab-donors" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-bold text-[#0b3b2c]">Donors Directory</h2>
-                    <p class="text-xs text-gray-500">Manage partner donors, contact details, and their giving records</p>
+                    <p class="text-xs text-gray-500">Track partner donors, unique donor numbers, and sort by latest activity</p>
                 </div>
-                <button id="btn-open-add-donor" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto">
-                    + Add New Donor
-                </button>
+                <div class="flex items-center gap-2 self-start md:self-auto">
+                    <button id="btn-export-donors" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                        📥 Export Donors CSV
+                    </button>
+                    <button id="btn-open-add-donor" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow transition">
+                        + Add New Donor
+                    </button>
+                </div>
+            </div>
+
+            <!-- Donor Filter & Sort Controls -->
+            <div class="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+                <input type="text" id="filter-donor-search" placeholder="🔍 Search by name, donor number, or phone..." class="p-2 border rounded-lg outline-none bg-gray-50 w-full sm:w-80">
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-600 font-medium">Sort by Last Donation:</span>
+                    <select id="sort-donor-activity" class="p-2 border rounded-lg outline-none bg-gray-50 font-semibold text-[#0b3b2c]">
+                        <option value="LATEST_FIRST">Latest to Oldest</option>
+                        <option value="OLDEST_FIRST">Oldest to Latest</option>
+                        <option value="NAME_ASC">Name (A-Z)</option>
+                    </select>
+                </div>
             </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -439,9 +461,12 @@
                     <table class="w-full text-left text-xs">
                         <thead class="bg-amber-50 text-amber-950 uppercase border-b border-amber-200">
                             <tr>
+                                <th class="p-2.5">Donor Code</th>
                                 <th class="p-2.5">Donor Name</th>
-                                <th class="p-2.5">Contact Information</th>
-                                <th class="p-2.5">Registered Date</th>
+                                <th class="p-2.5">Phone Number</th>
+                                <th class="p-2.5">Contact Notes</th>
+                                <th class="p-2.5">Last Active Donation</th>
+                                <th class="p-2.5">Total Donations</th>
                                 <th class="p-2.5 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -451,7 +476,7 @@
             </div>
         </section>
 
-        <!-- TAB 6: Asset Register -->
+        <!-- TAB 6: Asset Register (Scoped to own department for officers) -->
         <section id="tab-assets" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -460,7 +485,7 @@
                         <p class="text-xs text-gray-500">Laptops, machinery, tools, and durable items held across departments</p>
                     </div>
                     <div class="flex items-center gap-2 self-start md:self-auto">
-                        <button id="btn-open-asset-modal" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">
+                        <button id="btn-open-asset-modal" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow transition">
                             + Add Asset
                         </button>
                         <button id="btn-export-assets" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition">
@@ -510,15 +535,20 @@
             </div>
         </section>
 
-        <!-- TAB 7: Replenishment List -->
+        <!-- TAB 7: Replenishment List (Universal to all accounts) -->
         <section id="tab-replenishment" class="tab-content space-y-4 hidden">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-bold text-[#0b3b2c]">Replenishment & Market List</h2>
-                    <p class="text-xs text-gray-500">Automatically calculated from current stock and latest purchase rates</p>
+                    <p class="text-xs text-gray-500">Universal shopping & farm harvest procurement list based on live store deficits</p>
                 </div>
-                <div id="total-market-budget" class="text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg">
-                    Estimated Budget: KES 0.00
+                <div class="flex items-center gap-2 self-start md:self-auto">
+                    <div id="total-market-budget" class="text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg">
+                        Estimated Budget: KES 0.00
+                    </div>
+                    <button id="btn-export-replenish" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                        📥 Export Market List
+                    </button>
                 </div>
             </div>
 
@@ -550,7 +580,7 @@
                     <h2 class="text-lg font-bold text-[#0b3b2c]">Staff & Department Accounts</h2>
                     <p class="text-xs text-gray-500">Manage assigned operators, roles, and department login credentials</p>
                 </div>
-                <button id="btn-open-new-staff-modal" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto">
+                <button id="btn-open-new-staff-modal" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow transition self-start md:self-auto">
                     + Add Staff Account
                 </button>
             </div>
@@ -576,7 +606,11 @@
 
     </main>
 
-    <!-- MODAL: Catalog & Price Editor -->
+    <!-- ========================================================================= -->
+    <!-- MODAL DIALOGS (ALL ATTACHED & WIRED PROPERLY) -->
+    <!-- ========================================================================= -->
+
+    <!-- 1. Catalog & Pricing Editor Modal -->
     <div id="modal-catalog-editor" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b pb-2">
@@ -584,7 +618,7 @@
                     <h3 class="text-base font-bold text-[#0b3b2c]">Item Catalog & Pricing Editor</h3>
                     <p class="text-xs text-gray-500">Update standard prices, reorder levels, and perishability</p>
                 </div>
-                <button type="button" onclick="document.getElementById('modal-catalog-editor').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+                <button type="button" id="btn-close-catalog-modal" class="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
             </div>
             <div class="overflow-y-auto flex-grow">
                 <table class="w-full text-left text-xs">
@@ -604,11 +638,11 @@
         </div>
     </div>
 
-    <!-- MODAL: Add / Edit Donor -->
+    <!-- 2. Add / Edit Donor Modal (With Phone Number) -->
     <div id="modal-donor-editor" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 id="modal-donor-title" class="text-base font-bold text-[#0b3b2c] mb-1">Register New Donor</h3>
-            <p class="text-xs text-gray-500 mb-4">Add or edit partner, individual or organisation name</p>
+            <p class="text-xs text-gray-500 mb-4">Permanent donor number will be generated automatically</p>
             <form id="form-donor-editor" class="space-y-3 text-xs">
                 <input type="hidden" id="edit_donor_id">
                 <div>
@@ -616,18 +650,22 @@
                     <input type="text" id="donor_full_name" required placeholder="e.g. St. Andrew's Turi" class="w-full p-2 border rounded-lg text-sm outline-none">
                 </div>
                 <div>
+                    <label class="block font-semibold mb-1">Donor Phone Number</label>
+                    <input type="text" id="donor_phone_number" placeholder="e.g. +254 712 345 678" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div>
                     <label class="block font-semibold mb-1">Contact Details / Notes</label>
-                    <input type="text" id="donor_contact_info" placeholder="Phone, email, or address" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    <input type="text" id="donor_contact_info" placeholder="Email, church leader, or address" class="w-full p-2 border rounded-lg text-sm outline-none">
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t">
-                    <button type="button" onclick="document.getElementById('modal-donor-editor').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="button" id="btn-cancel-donor-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-[#e85d04] text-white rounded-lg font-semibold hover:bg-[#d05203]">Save Donor</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Edit My Profile -->
+    <!-- 3. Edit My Profile Modal (Admin / User Handover) -->
     <div id="modal-my-profile" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Update Operator Name</h3>
@@ -642,14 +680,14 @@
                     <input type="text" id="my_profile_dept" disabled class="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-600">
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t">
-                    <button type="button" onclick="document.getElementById('modal-my-profile').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="button" id="btn-cancel-profile-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Save Name</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Add New Master Item -->
+    <!-- 4. Add New Master Item Modal -->
     <div id="modal-new-item" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Create New Item</h3>
@@ -689,14 +727,14 @@
                     <label for="new_item_perishable" class="text-gray-700 font-medium">Is this item perishable? (Requires expiry tracking)</label>
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t">
-                    <button type="button" onclick="document.getElementById('modal-new-item').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="button" id="btn-cancel-item-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Save Item</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Add New Asset -->
+    <!-- 5. Add New Asset Modal -->
     <div id="modal-new-asset" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Record Durable Asset</h3>
@@ -749,8 +787,81 @@
                     <input type="text" id="asset_tag" placeholder="e.g. SN-883921" class="w-full p-2 border rounded-lg text-sm outline-none">
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t">
-                    <button type="button" onclick="document.getElementById('modal-new-asset').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="button" id="btn-cancel-asset-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Save Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 6. Add New Staff Account Modal (Admin Only) -->
+    <div id="modal-new-staff" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Create Staff Account</h3>
+            <p class="text-xs text-gray-500 mb-4">Assign an operator and login credentials to a department</p>
+            <form id="form-create-staff" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold mb-1">Staff Full Name</label>
+                    <input type="text" id="new_staff_name" required placeholder="e.g. Sarah Mwangi" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Department</label>
+                        <select id="new_staff_dept" required class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none"></select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">System Role</label>
+                        <select id="new_staff_role" required class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none">
+                            <option value="Department Officer">Department Officer</option>
+                            <option value="Storekeeper">Storekeeper</option>
+                            <option value="Executive Admin">Executive Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Staff Email / Login Identifier</label>
+                    <input type="email" id="new_staff_email" required placeholder="e.g. sarah@amyshouse.org" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t">
+                    <button type="button" id="btn-cancel-staff-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Create Staff</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 7. Edit Staff Account Modal (Admin Only) -->
+    <div id="modal-edit-staff" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Edit Staff Account</h3>
+            <p class="text-xs text-gray-500 mb-4">Update assigned operator, department role, or active status</p>
+            <form id="form-edit-staff" class="space-y-3 text-xs">
+                <input type="hidden" id="edit_staff_id">
+                <div>
+                    <label class="block font-semibold mb-1">Assigned Staff Name</label>
+                    <input type="text" id="edit_staff_name" required class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Department</label>
+                        <select id="edit_staff_dept" class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none"></select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">System Role</label>
+                        <select id="edit_staff_role" class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none">
+                            <option value="Executive Admin">Executive Admin</option>
+                            <option value="Storekeeper">Storekeeper</option>
+                            <option value="Department Officer">Department Officer</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 pt-2">
+                    <input type="checkbox" id="edit_staff_active" class="rounded text-[#0b3b2c]">
+                    <label for="edit_staff_active" class="font-medium">Account is Active</label>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t">
+                    <button type="button" id="btn-cancel-edit-staff-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Update Staff</button>
                 </div>
             </form>
         </div>

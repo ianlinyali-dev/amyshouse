@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amys-house-v9'; 
+const CACHE_NAME = 'amys-house-v10'; 
 const ASSETS = [
   './',
   './index.html',
@@ -15,7 +15,11 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then(k => Promise.all(k.map(key => key !== CACHE_NAME ? caches.delete(key) : null))));
+  e.waitUntil(
+    caches.keys().then(keys => 
+      Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))
+    )
+  );
   self.clients.claim();
 });
 

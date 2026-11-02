@@ -12,153 +12,550 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-[#fcfbf9] text-gray-800 antialiased min-h-screen flex flex-col">
+<body class="bg-[#fcfbf9] text-gray-800 antialiased min-h-screen flex flex-col font-sans">
 
+    <!-- Top Navigation Header -->
     <header class="bg-[#0b3b2c] text-white shadow-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap justify-between items-center gap-2">
             <div class="flex items-center space-x-3">
-                <img src="logo.png" alt="MSCP" class="w-10 h-10 object-contain rounded-md bg-white/10 p-1">
+                <img src="logo.png" alt="MSCP" class="w-10 h-10 object-contain rounded bg-white/10 p-1">
                 <div>
-                    <h1 class="font-bold text-lg leading-tight">Amy's House Store</h1>
-                    <p id="user-display-role" class="text-xs text-[#e85d04] font-medium tracking-wider uppercase">MSCP Inventory System</p>
+                    <h1 class="font-bold text-base md:text-lg leading-tight">MSCP Amy's House Inventory</h1>
+                    <p id="user-display-role" class="text-xs text-[#e85d04] font-semibold tracking-wide">Please Log In</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-3">
-                <span id="sync-status" class="text-xs bg-green-700/60 px-2 py-1 rounded text-emerald-100">Online</span>
-                <button id="logout-btn" style="display: none;" class="text-xs underline hover:text-[#e85d04]">Logout</button>
+            <div class="flex items-center space-x-3 text-xs">
+                <span id="sync-status" class="bg-emerald-800 border border-emerald-600 px-2.5 py-1 rounded-full text-emerald-100 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Online
+                </span>
+                <button id="logout-btn" style="display: none;" class="bg-red-700/80 hover:bg-red-700 px-3 py-1 rounded text-white font-medium transition">
+                    Logout
+                </button>
             </div>
         </div>
+
+        <!-- System Tab Navigation Bar (Visible When Authenticated) -->
+        <nav id="app-nav-tabs" style="display: none;" class="bg-[#07281c] border-t border-emerald-900/50 px-4">
+            <div class="max-w-7xl mx-auto flex space-x-1 overflow-x-auto text-xs font-medium py-1 scrollbar-none">
+                <button data-tab="tab-stock" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5 active-tab">
+                    📦 Stock Balances
+                </button>
+                <button data-tab="tab-move" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                    ➕ Record Movement
+                </button>
+                <button data-tab="tab-ledger" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                    📜 Movement Ledger
+                </button>
+                <button data-tab="tab-donations" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                    🎁 Donation Register
+                </button>
+                <button data-tab="tab-assets" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                    💻 Asset Register
+                </button>
+                <button data-tab="tab-replenishment" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                    🛒 Replenishment List
+                </button>
+            </div>
+        </nav>
     </header>
 
-    <!-- Clean Department Code Login Screen -->
+    <!-- 1. Authentication Section -->
     <main id="auth-section" class="flex-grow flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100 w-full max-w-md">
-            <h2 class="text-2xl font-bold text-[#0b3b2c] mb-1 text-center">System Login</h2>
-            <p class="text-xs text-gray-500 mb-6 text-center">Enter your Department Code & Staff Name</p>
+        <div class="bg-white p-7 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md">
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 bg-emerald-50 text-[#0b3b2c] rounded-2xl flex items-center justify-center mx-auto mb-2 text-2xl font-black">
+                    AH
+                </div>
+                <h2 class="text-xl font-bold text-[#0b3b2c]">Department Access</h2>
+                <p class="text-xs text-gray-500">Sign in using your department role & staff credentials</p>
+            </div>
             
-            <div id="login-error-box" style="display: none;" class="mb-4 text-xs bg-red-50 text-red-700 p-3 rounded border border-red-200"></div>
+            <div id="login-error-box" style="display: none;" class="mb-4 text-xs bg-red-50 text-red-700 p-3 rounded-lg border border-red-200"></div>
 
             <form id="login-form" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Department Code</label>
-                    <select id="auth-dept-code" required class="w-full p-2.5 border rounded text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
-                        <option value="">Select Department Code...</option>
-                        <option value="AD001">AD001 - Executive Admin (Dorothy)</option>
-                        <option value="ST001">ST001 - Central Store (Amy's House)</option>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Select Department</label>
+                    <select id="auth-dept-code" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
+                        <option value="">Choose department...</option>
+                        <option value="AD001">AD001 - Executive Admin (Dorothy / Management)</option>
+                        <option value="ST001">ST001 - Central Store (Storekeeper)</option>
                         <option value="FC001">FC001 - Family Care Department</option>
+                        <option value="ES001">ES001 - Education Support Department</option>
+                        <option value="EE001">EE001 - Economic Empowerment</option>
+                        <option value="FN001">FN001 - Finance Office</option>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Your Name (Operator)</label>
-                    <input type="text" id="auth-staff-name" required placeholder="e.g. Dorothy, Edward, Paul" class="w-full p-2 border rounded text-sm outline-none">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Operator Staff Name</label>
+                    <input type="text" id="auth-staff-name" required placeholder="e.g. Dorothy, Edward, Paul" class="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0b3b2c]">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Department Password / PIN</label>
-                    <input type="password" id="auth-password" required placeholder="••••••••" class="w-full p-2 border rounded text-sm outline-none">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Access PIN / Password</label>
+                    <input type="password" id="auth-password" required placeholder="••••••••" class="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0b3b2c]">
                 </div>
 
-                <button type="submit" id="login-submit-btn" class="w-full bg-[#e85d04] hover:bg-[#d05203] text-white font-bold py-2.5 rounded shadow transition">
-                    Access Department
+                <button type="submit" id="login-submit-btn" class="w-full bg-[#0b3b2c] hover:bg-[#07281c] text-white font-semibold py-2.5 rounded-lg shadow transition">
+                    Unlock System
                 </button>
             </form>
         </div>
     </main>
 
-    <!-- Main Workspace -->
-    <main id="dashboard-section" style="display: none;" class="flex-grow max-w-7xl w-full mx-auto p-4 grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Left: Record Movement Form -->
-        <section class="bg-white p-5 rounded-xl shadow-sm border border-emerald-900/10 lg:col-span-1 h-fit">
-            <h2 class="text-md font-bold text-[#0b3b2c] mb-4 border-b pb-2">Record Movement</h2>
-            <form id="movement-form" class="space-y-4">
+    <!-- 2. Main Dashboard & Workspaces -->
+    <main id="dashboard-section" style="display: none;" class="flex-grow max-w-7xl w-full mx-auto p-4 space-y-6">
+
+        <!-- TAB 1: Stock Balances Overview -->
+        <section id="tab-stock" class="tab-content space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Movement Type</label>
-                    <select id="movement_type" required class="w-full p-2 border rounded text-sm bg-gray-50">
-                        <option value="">Choose...</option>
-                        <option value="Purchase">Purchase (In)</option>
-                        <option value="Donation">Donation (In)</option>
-                        <option value="Weekly supply">Weekly supply (Out)</option>
-                        <option value="Top-up">Top-up (Out)</option>
-                        <option value="Issue to department">Issue to dept (Out)</option>
+                    <h2 class="text-lg font-bold text-[#0b3b2c]">Live Stock Balances</h2>
+                    <p class="text-xs text-gray-500">Live inventory across Amy's House Central Store & Departments</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="filter-stock-dept" class="border rounded-lg text-xs p-2 bg-gray-50 outline-none">
+                        <option value="ALL">All Departments</option>
                     </select>
+                    <button id="btn-export-stock" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+                        📥 Export CSV
+                    </button>
                 </div>
+            </div>
 
-                <div id="donation-fields" style="display: none;" class="space-y-3 bg-orange-50 p-3 rounded border border-orange-100">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600">Donor</label>
-                        <select id="donor_id" class="w-full p-2 border rounded text-sm"><option value="">Select Donor...</option></select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600">Ref No.</label>
-                            <input type="text" id="donation_ref" placeholder="e.g. AH/DR/001" class="w-full p-2 border rounded text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600">Condition</label>
-                            <select id="item_condition" class="w-full p-2 border rounded text-sm">
-                                <option value="Good">Good</option>
-                                <option value="Fair">Fair</option>
-                                <option value="Damaged">Damaged</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Item</label>
-                    <select id="item_id" required class="w-full p-2 border rounded text-sm bg-gray-50"><option value="">Loading...</option></select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Whose Stock / Earmark</label>
-                    <select id="department_id" required class="w-full p-2 border rounded text-sm bg-gray-50"><option value="">Loading...</option></select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Direction</label>
-                        <select id="direction" required class="w-full p-2 border rounded text-sm bg-gray-50">
-                            <option value="In">In (+)</option>
-                            <option value="Out">Out (-)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Quantity</label>
-                        <input type="number" id="quantity" step="0.01" min="0.01" required placeholder="0" class="w-full p-2 border rounded text-sm">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Reason / Notes</label>
-                    <input type="text" id="reason" placeholder="e.g. Baking / Children returned" class="w-full p-2 border rounded text-sm">
-                </div>
-
-                <button type="submit" class="w-full bg-[#0b3b2c] hover:bg-[#07281c] text-white font-medium p-2.5 rounded shadow transition">Save Movement</button>
-            </form>
-        </section>
-
-        <!-- Right: Live Balances -->
-        <section class="lg:col-span-2 space-y-6">
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-emerald-900/10">
-                <h2 class="text-md font-bold text-[#0b3b2c] mb-3">Live Stock Balances</h2>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-emerald-50 text-[#0b3b2c] text-xs uppercase border-b border-emerald-100">
                             <tr>
-                                <th class="p-2.5">Item</th>
-                                <th class="p-2.5">Department</th>
-                                <th class="p-2.5">Balance</th>
-                                <th class="p-2.5">Status</th>
+                                <th class="p-3">Item Name</th>
+                                <th class="p-3">Category</th>
+                                <th class="p-3">Stock Owner</th>
+                                <th class="p-3">Balance</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Perishable?</th>
                             </tr>
                         </thead>
-                        <tbody id="balances-table-body" class="divide-y divide-gray-100"></tbody>
+                        <tbody id="balances-table-body" class="divide-y divide-gray-100">
+                            <tr><td colspan="6" class="text-center p-6 text-gray-400">Loading stock balances...</td></tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
         </section>
+
+        <!-- TAB 2: Record Movement Form (Single entry point for In & Out) -->
+        <section id="tab-move" class="tab-content max-w-2xl mx-auto hidden">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-5">
+                <div class="border-b pb-3 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-[#0b3b2c]">Record Stock Movement</h2>
+                        <p class="text-xs text-gray-500">Every movement is entered once; balances update automatically.</p>
+                    </div>
+                    <button type="button" id="btn-open-new-item-modal" class="text-xs bg-[#e85d04] hover:bg-[#d05203] text-white px-2.5 py-1.5 rounded-lg font-medium transition">
+                        + New Item
+                    </button>
+                </div>
+
+                <form id="movement-form" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Movement Type</label>
+                            <select id="movement_type" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
+                                <option value="">Select type...</option>
+                                <option value="Purchase">Purchase (In)</option>
+                                <option value="Donation (Amy's House)">Donation for Amy's House (In)</option>
+                                <option value="Donation (Department)">Donation for a Department (In)</option>
+                                <option value="Farm Produce">Farm Produce (In)</option>
+                                <option value="Weekly Supply">Weekly Supply (Out - Regular Friday)</option>
+                                <option value="Top-up">Top-up (Out - Between Fridays)</option>
+                                <option value="Issue to Department">Issue to Department (Out)</option>
+                                <option value="Spoilage or Loss">Spoilage / Loss (Out)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Direction</label>
+                            <select id="direction" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-100 font-semibold text-[#0b3b2c] outline-none">
+                                <option value="In">In (+ Stock Received)</option>
+                                <option value="Out">Out (- Stock Consumed / Issued)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Donation Details Panel -->
+                    <div id="donation-fields" style="display: none;" class="p-4 bg-orange-50/70 border border-orange-200 rounded-xl space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-orange-900 uppercase tracking-wide">Donation Information</span>
+                            <button type="button" id="btn-open-new-donor-modal" class="text-xs text-[#e85d04] underline hover:font-bold">+ Add Donor</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Donor Name</label>
+                                <select id="donor_id" class="w-full p-2 border rounded-lg text-sm bg-white outline-none">
+                                    <option value="">Select Donor...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Donation Ref No.</label>
+                                <input type="text" id="donation_ref" placeholder="e.g. AH/DR/001" class="w-full p-2 border rounded-lg text-sm outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Condition</label>
+                                <select id="item_condition" class="w-full p-2 border rounded-lg text-sm bg-white outline-none">
+                                    <option value="Good">Good</option>
+                                    <option value="Fair">Fair</option>
+                                    <option value="Damaged">Damaged</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item & Department Selection -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Item to Move</label>
+                            <select id="item_id" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
+                                <option value="">Select Item...</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Whose Stock / Department</label>
+                            <select id="department_id" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
+                                <option value="">Select Department...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Quantity & Cost -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Quantity</label>
+                            <input type="number" id="quantity" step="0.01" min="0.01" required placeholder="0.00" class="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0b3b2c]">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Unit Cost / Value (KES)</label>
+                            <input type="number" id="unit_price" step="0.01" min="0" placeholder="Optional" class="w-full p-2.5 border rounded-lg text-sm outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Expiry Date (Perishables)</label>
+                            <input type="date" id="expiry_date" class="w-full p-2.5 border rounded-lg text-sm outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Reason, People Count & Audit Notes -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Reason Category</label>
+                            <select id="reason_category" class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 outline-none">
+                                <option value="">General Consumption</option>
+                                <option value="Baking">Baking</option>
+                                <option value="Children Returned">Children are back / School holiday</option>
+                                <option value="Event">Event / Celebration</option>
+                                <option value="Work / Construction">Work / Construction staff</option>
+                                <option value="Department Request">Department Request</option>
+                                <option value="Spoilage">Spoilage / Expiry Loss</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">People Count (If Surge)</label>
+                            <input type="number" id="people_count" min="1" placeholder="e.g. 45" class="w-full p-2.5 border rounded-lg text-sm outline-none">
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Specific Notes</label>
+                            <input type="text" id="reason" placeholder="Specific comments..." class="w-full p-2.5 border rounded-lg text-sm outline-none">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-save-movement" class="w-full bg-[#0b3b2c] hover:bg-[#07281c] text-white font-semibold py-3 rounded-lg shadow-md transition">
+                        Confirm & Save Movement
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 3: Movement Ledger & Top-Up Audit Trail -->
+        <section id="tab-ledger" class="tab-content space-y-4 hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div>
+                    <h2 class="text-lg font-bold text-[#0b3b2c]">Movement Audit Ledger</h2>
+                    <p class="text-xs text-gray-500">Every single transaction entered into the store is permanently tracked.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="filter-ledger-type" class="border rounded-lg text-xs p-2 bg-gray-50 outline-none">
+                        <option value="ALL">All Movement Types</option>
+                        <option value="Top-up">Top-ups Only</option>
+                        <option value="Weekly Supply">Weekly Supplies</option>
+                        <option value="Purchase">Purchases</option>
+                        <option value="Issue to Department">Department Issues</option>
+                    </select>
+                    <button id="btn-export-ledger" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition">
+                        📥 Export Ledger
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-emerald-50 text-[#0b3b2c] uppercase border-b border-emerald-100">
+                            <tr>
+                                <th class="p-2.5">Date / Time</th>
+                                <th class="p-2.5">Type</th>
+                                <th class="p-2.5">Item</th>
+                                <th class="p-2.5">Owner Dept</th>
+                                <th class="p-2.5">Qty</th>
+                                <th class="p-2.5">Reason & Details</th>
+                                <th class="p-2.5">Staff / Operator</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-table-body" class="divide-y divide-gray-100">
+                            <tr><td colspan="7" class="text-center p-6 text-gray-400">Loading ledger records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: Dedicated Donation Register -->
+        <section id="tab-donations" class="tab-content space-y-4 hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div>
+                    <h2 class="text-lg font-bold text-[#0b3b2c]">Donation Register</h2>
+                    <p class="text-xs text-gray-500">Gifts received, donor intent, consumption, and what remains in the Central Store.</p>
+                </div>
+                <button id="btn-export-donations" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition">
+                    📥 Export Register
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-orange-50 text-orange-950 uppercase border-b border-orange-100">
+                            <tr>
+                                <th class="p-2.5">Ref No.</th>
+                                <th class="p-2.5">Donor</th>
+                                <th class="p-2.5">Item</th>
+                                <th class="p-2.5">Donor Intent</th>
+                                <th class="p-2.5">Condition</th>
+                                <th class="p-2.5">Received</th>
+                                <th class="p-2.5">Used</th>
+                                <th class="p-2.5 font-bold">Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody id="donations-table-body" class="divide-y divide-gray-100">
+                            <tr><td colspan="8" class="text-center p-6 text-gray-400">Loading donation register...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: Asset Register -->
+        <section id="tab-assets" class="tab-content space-y-4 hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div>
+                    <h2 class="text-lg font-bold text-[#0b3b2c]">Durable Asset Register</h2>
+                    <p class="text-xs text-gray-500">Equipment, laptops, furniture, and tools held across MSCP departments.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-open-asset-modal" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">
+                        + Add Asset
+                    </button>
+                    <button id="btn-export-assets" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition">
+                        📥 Export Assets
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-emerald-50 text-[#0b3b2c] uppercase border-b border-emerald-100">
+                            <tr>
+                                <th class="p-2.5">Asset Name</th>
+                                <th class="p-2.5">Department</th>
+                                <th class="p-2.5">Acquisition</th>
+                                <th class="p-2.5">Condition</th>
+                                <th class="p-2.5">Location</th>
+                                <th class="p-2.5">Custodian</th>
+                                <th class="p-2.5">Serial / Tag</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assets-table-body" class="divide-y divide-gray-100">
+                            <tr><td colspan="7" class="text-center p-6 text-gray-400">Loading durable assets...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 6: Replenishment & Market List -->
+        <section id="tab-replenishment" class="tab-content space-y-4 hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div>
+                    <h2 class="text-lg font-bold text-[#0b3b2c]">Replenishment & Market Shopping List</h2>
+                    <p class="text-xs text-gray-500">Automatically generated for items running low or below reorder levels.</p>
+                </div>
+                <div id="total-market-budget" class="text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg">
+                    Estimated Budget: KES 0.00
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-amber-50 text-amber-950 uppercase border-b border-amber-200">
+                            <tr>
+                                <th class="p-2.5">Item</th>
+                                <th class="p-2.5">Category</th>
+                                <th class="p-2.5">Current Stock</th>
+                                <th class="p-2.5">Reorder Threshold</th>
+                                <th class="p-2.5 font-bold text-red-700">Recommended Buy</th>
+                                <th class="p-2.5">Unit Cost (Est.)</th>
+                                <th class="p-2.5 text-right font-bold">Total Budget</th>
+                            </tr>
+                        </thead>
+                        <tbody id="replenishment-table-body" class="divide-y divide-gray-100">
+                            <tr><td colspan="7" class="text-center p-6 text-gray-400">Loading replenishment list...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
     </main>
+
+    <!-- MODAL 1: Add New Master Item -->
+    <div id="modal-new-item" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Create New Inventory Item</h3>
+            <p class="text-xs text-gray-500 mb-4">Add a new commodity to the standard master catalogue</p>
+            <form id="form-create-item" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold mb-1">Item Name</label>
+                    <input type="text" id="new_item_name" required placeholder="e.g. Rice (Pishori), Sunlight Soap" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Unit of Measure</label>
+                        <input type="text" id="new_item_unit" required placeholder="e.g. KG, L, Pieces" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Category</label>
+                        <select id="new_item_category" class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none">
+                            <option value="Food">Food</option>
+                            <option value="Non-Food">Non-Food</option>
+                            <option value="Stationery">Stationery</option>
+                            <option value="Farm Produce">Farm Produce</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Reorder Level</label>
+                        <input type="number" id="new_item_reorder" step="1" value="10" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Standard Cost (KES)</label>
+                        <input type="number" id="new_item_cost" step="0.01" value="100" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 pt-1">
+                    <input type="checkbox" id="new_item_perishable" class="rounded text-[#0b3b2c] focus:ring-0">
+                    <label for="new_item_perishable" class="text-gray-700 font-medium">Is this item perishable? (Requires expiry tracking)</label>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t">
+                    <button type="button" onclick="document.getElementById('modal-new-item').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Save Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Add New Donor -->
+    <div id="modal-new-donor" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Register New Donor</h3>
+            <p class="text-xs text-gray-500 mb-4">Add partner, family, or organisation name</p>
+            <form id="form-create-donor" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold mb-1">Donor Full Name</label>
+                    <input type="text" id="new_donor_name" required placeholder="e.g. Rotary Club Nakuru" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Contact / Details</label>
+                    <input type="text" id="new_donor_contact" placeholder="Phone, email or address" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t">
+                    <button type="button" onclick="document.getElementById('modal-new-donor').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-[#e85d04] text-white rounded-lg font-semibold hover:bg-[#d05203]">Save Donor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Add New Asset -->
+    <div id="modal-new-asset" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Record Durable Asset</h3>
+            <p class="text-xs text-gray-500 mb-4">Track durable items like laptops, machines, or furniture</p>
+            <form id="form-create-asset" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold mb-1">Asset Description</label>
+                    <input type="text" id="asset_name" required placeholder="e.g. HP Laptop ProBook, Shaving Machine" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Owning Department</label>
+                        <select id="asset_dept_id" required class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none"></select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Acquisition Type</label>
+                        <select id="asset_acq_type" required class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none">
+                            <option value="Existing">Existing (Prior to app)</option>
+                            <option value="Donation">Donation</option>
+                            <option value="Purchase">Purchase</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Current Condition</label>
+                        <select id="asset_condition" class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none">
+                            <option value="Good">Good</option>
+                            <option value="Fair">Fair</option>
+                            <option value="Damaged">Damaged</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Estimated Cost / Value</label>
+                        <input type="number" id="asset_cost" step="0.01" placeholder="KES" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Storage Location</label>
+                        <input type="text" id="asset_location" required placeholder="e.g. Library, Store" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Person Responsible / Custodian</label>
+                        <input type="text" id="asset_custodian" required placeholder="e.g. Paul, Teacher Mary" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Serial / Tag Number</label>
+                    <input type="text" id="asset_tag" placeholder="e.g. SN-998822 or MSCP/ED/01" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t">
+                    <button type="button" onclick="document.getElementById('modal-new-asset').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Save Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

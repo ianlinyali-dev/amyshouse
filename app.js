@@ -1,5 +1,5 @@
 // ==============================================================================
-// MSCP AMY'S HOUSE INVENTORY SYSTEM - BULLETPROOF APP CONTROLLER
+// MSCP AMY'S HOUSE INVENTORY SYSTEM - BULLETPROOF DEFINITIVE CONTROLLER
 // ==============================================================================
 
 const SUPABASE_URL = 'https://sfrgoujuwmctssszndrs.supabase.co';
@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const errorBox = document.getElementById('login-error-box');
 
     // --------------------------------------------------------------------------
-    // 1. AUTHENTICATION & SESSION
+    // 1. AUTHENTICATION & ACCESS SCOPE
     // --------------------------------------------------------------------------
     const { data: { session } } = await supabase.auth.getSession();
     const savedStaffName = sessionStorage.getItem('staff_name');
@@ -110,56 +110,127 @@ document.addEventListener('DOMContentLoaded', async () => {
         myProfileBtn.style.display = 'inline-block';
 
         const isAdmin = currentUserDeptCode === 'AD001';
+        const isStorekeeper = currentUserDeptCode === 'ST001';
+
         const roleTitle = isAdmin 
-            ? 'Executive Admin' 
-            : currentUserDeptCode === 'ST001' 
+            ? 'Executive Admin (Full Access)' 
+            : isStorekeeper 
             ? 'Central Storekeeper' 
-            : `Department User [${currentUserDeptCode}]`;
+            : `Department Operator [${currentUserDeptCode}]`;
 
         document.getElementById('user-display-role').textContent = `${currentUserName} · ${roleTitle}`;
 
+        // STRICT ACCESS PRIVILEGES
+        // Admin (AD001) sees everything.
+        // Central Store (ST001) sees store stock and movements.
+        // Departments (FC, ES, EE, FN) only see their own stocks, their assets, movements & universal replenishment.
+        // Protected tabs (Donation Register, Donors Directory, Staff Accounts) are hidden from department accounts.
         if (isAdmin) {
             document.getElementById('nav-btn-accounts').style.display = 'flex';
+            document.getElementById('nav-btn-donations').style.display = 'flex';
+            document.getElementById('nav-btn-donors').style.display = 'flex';
+            document.getElementById('btn-open-catalog-edit').style.display = 'inline-block';
+        } else {
+            document.getElementById('nav-btn-accounts').style.display = 'none';
+            document.getElementById('nav-btn-donations').style.display = 'none';
+            document.getElementById('nav-btn-donors').style.display = 'none';
+            document.getElementById('btn-open-catalog-edit').style.display = isStorekeeper ? 'inline-block' : 'none';
         }
 
         setupTabNavigation();
+        wireAllModalButtons();
         loadMasterMetadata();
         setupFilters();
         refreshAllViews();
     }
 
     // --------------------------------------------------------------------------
-    // 2. ACTION CENTRE: EXPIRY & URGENT STOCK ALERTS
+    // 2. MODAL WIRING
+    // --------------------------------------------------------------------------
+    function wireAllModalButtons() {
+        // Open buttons
+        safeClick('btn-open-new-item-modal', () => showModal('modal-new-item'));
+        safeClick('btn-open-new-donor-modal', () => openDonorEditor());
+        safeClick('btn-open-add-donor', () => openDonorEditor());
+        safeClick('btn-open-asset-modal', () => showModal('modal-new-asset'));
+        safeClick('btn-open-new-staff-modal', () => showModal('modal-new-staff'));
+        safeClick('btn-open-catalog-edit', () => { renderCatalogEditor(); showModal('modal-catalog-editor'); });
+        safeClick('btn-edit-my-profile', () => {
+            document.getElementById('my_profile_name').value = currentUserName;
+            document.getElementById('my_profile_dept').value = `${currentUserDeptCode} (${currentUserEmail})`;
+            showModal('modal-my-profile');
+        });
+
+        // Close / Cancel buttons
+        safeClick('btn-close-catalog-modal', () => hideModal('modal-catalog-editor'));
+        safeClick('btn-cancel-donor-modal', () => hideModal('modal-donor-editor'));
+        safeClick('btn-cancel-profile-modal', () => hideModal('modal-my-profile'));
+        safeClick('btn-cancel-item-modal', () => hideModal('modal-new-item'));
+        safeClick('btn-cancel-asset-modal', () => hideModal('modal-new-asset'));
+        safeClick('btn-cancel-staff-modal', () => hideModal('modal-new-staff'));
+        safeClick('btn-cancel-edit-staff-modal', () => hideModal('modal-edit-staff'));
+    }
+
+    function safeClick(id, fn) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('click', fn);
+    }
+
+    function showModal(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('hidden');
+    }
+
+    function hideModal(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    }
+
+    // --------------------------------------------------------------------------
+    // 3. ACTION CENTRE ALERTS (LOW STOCK + EXPIRY WARNINGS)
     // --------------------------------------------------------------------------
     async function loadActionCentre() {
         const panel = document.getElementById('action-centre-panel');
         const container = document.getElementById('action-centre-items');
         const countBadge = document.getElementById('action-centre-count');
 
-        const { data: alerts, error } = await supabase.from('action_centre_alerts').select('*');
+        let query = supabase.from('action_centre_alerts').select('*');
+
+        // Department isolation: officers only see alerts for their own department
+        if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+            query = query.eq('dept_code', currentUserDeptCode);
+        }
+
+        const { data: alerts, error } = await query;
         if (error || !alerts || !alerts.length) {
             panel.style.display = 'none';
             return;
         }
 
         panel.style.display = 'block';
-        countBadge.textContent = `${alerts.length} Urgent Alert${alerts.length > 1 ? 's' : ''}`;
+        countBadge.textContent = `${alerts.length} Alert${alerts.length > 1 ? 's' : ''}`;
 
         container.innerHTML = alerts.map(a => {
-            const isExpired = a.alert_status === 'EXPIRED';
+            const isExpired = a.alert_type === 'EXPIRED';
+            const isLow = a.alert_type === 'LOW_STOCK';
+
             return `
-                <div class="py-2 flex flex-col md:flex-row md:items-center justify-between gap-2 ${isExpired ? 'bg-red-50/60 p-2 rounded' : ''}">
+                <div class="py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 ${isExpired ? 'bg-red-50/70 p-2 rounded' : ''}">
                     <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 rounded text-[11px] font-bold ${isExpired ? 'bg-red-600 text-white' : 'bg-amber-100 text-amber-900'}">
-                            ${isExpired ? '🔴 EXPIRED' : `🟡 EXPIRES IN ${a.days_remaining} DAYS`}
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold ${
+                            isExpired ? 'bg-red-600 text-white' : 
+                            isLow ? 'bg-orange-100 text-orange-900 border border-orange-300' : 
+                            'bg-amber-100 text-amber-900'
+                        }">
+                            ${a.alert_type}
                         </span>
                         <span class="font-bold text-gray-900">${a.item_name}</span>
-                        <span class="text-gray-500">(${a.quantity} ${a.unit} in ${a.department_name})</span>
-                        <span class="text-xs font-mono text-gray-400">Batch Expiry: ${a.expiry_date}</span>
+                        <span class="text-gray-500">(${a.department_name})</span>
+                        <span class="text-xs text-gray-600">${a.alert_message}</span>
                     </div>
                     <div>
-                        <button onclick="window.handleActionCentreAlert('${a.item_id}', '${a.item_name}', '${isExpired ? 'Spoilage or Loss' : 'Weekly Supply'}')" class="text-xs font-semibold px-2.5 py-1 rounded transition ${isExpired ? 'bg-red-700 hover:bg-red-800 text-white' : 'bg-[#0b3b2c] hover:bg-[#07281c] text-white'}">
-                            ${isExpired ? 'Write off as Spoilage' : 'Prioritize for Consumption (FIFO)'}
+                        <button onclick="window.handleActionCentreAlert('${a.item_id}', '${a.item_name}', '${isExpired ? 'Spoilage or Loss' : isLow ? 'Purchase' : 'Weekly Supply'}')" class="text-xs font-semibold px-2.5 py-1 rounded transition ${isExpired ? 'bg-red-700 hover:bg-red-800 text-white' : 'bg-[#0b3b2c] hover:bg-[#07281c] text-white'}">
+                            ${isExpired ? 'Write off Spoilage' : isLow ? 'Order More' : 'Prioritize (FIFO)'}
                         </button>
                     </div>
                 </div>
@@ -172,11 +243,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('movement_type').value = recommendedMovement;
         document.getElementById('movement_type').dispatchEvent(new Event('change'));
         document.getElementById('item_id').value = itemId;
-        document.getElementById('reason').value = `Action Centre: ${recommendedMovement} for ${itemName}`;
+        document.getElementById('reason').value = `Action Centre: Action for ${itemName}`;
     };
 
     // --------------------------------------------------------------------------
-    // 3. TAB NAVIGATION
+    // 4. TAB NAVIGATION
     // --------------------------------------------------------------------------
     function setupTabNavigation() {
         const tabs = document.querySelectorAll('.tab-btn');
@@ -202,7 +273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 4. MASTER METADATA & DROPDOWNS
+    // 5. MASTER METADATA & LOCKS
     // --------------------------------------------------------------------------
     async function loadMasterMetadata() {
         try {
@@ -229,22 +300,56 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const deptSelect = document.getElementById('department_id');
         const assetDeptSelect = document.getElementById('asset_dept_id');
+        const newStaffDeptSelect = document.getElementById('new_staff_dept');
+        const editStaffDeptSelect = document.getElementById('edit_staff_dept');
         const filterStockDept = document.getElementById('filter-stock-dept');
         const filterLedgerDept = document.getElementById('filter-ledger-dept');
         const filterAssetsDept = document.getElementById('filter-assets-dept');
 
-        const deptOptions = '<option value="">Select Department...</option>' + 
-            cachedDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+        // Department Lockdown: If not Admin/Storekeeper, lock to own department
+        if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+            const myDept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
+            if (myDept) {
+                deptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
+                deptSelect.disabled = true;
 
-        deptSelect.innerHTML = deptOptions;
-        assetDeptSelect.innerHTML = deptOptions;
+                assetDeptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
+                assetDeptSelect.disabled = true;
 
-        const filterOptions = '<option value="ALL">All Departments</option>' + 
-            cachedDepts.map(d => `<option value="${d.dept_code}">${d.name}</option>`).join('');
+                filterStockDept.innerHTML = `<option value="${myDept.dept_code}">${myDept.name}</option>`;
+                filterStockDept.disabled = true;
 
-        filterStockDept.innerHTML = filterOptions;
-        filterLedgerDept.innerHTML = filterOptions;
-        filterAssetsDept.innerHTML = filterOptions;
+                filterLedgerDept.innerHTML = `<option value="${myDept.dept_code}">${myDept.name}</option>`;
+                filterLedgerDept.disabled = true;
+
+                filterAssetsDept.innerHTML = `<option value="${myDept.dept_code}">${myDept.name}</option>`;
+                filterAssetsDept.disabled = true;
+            }
+        } else {
+            const deptOptions = '<option value="">Select Department...</option>' + 
+                cachedDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+
+            deptSelect.innerHTML = deptOptions;
+            deptSelect.disabled = false;
+
+            assetDeptSelect.innerHTML = deptOptions;
+            assetDeptSelect.disabled = false;
+
+            const filterOptions = '<option value="ALL">All Departments</option>' + 
+                cachedDepts.map(d => `<option value="${d.dept_code}">${d.name}</option>`).join('');
+
+            filterStockDept.innerHTML = filterOptions;
+            filterLedgerDept.innerHTML = filterOptions;
+            filterAssetsDept.innerHTML = filterOptions;
+        }
+
+        // Staff account dropdowns (Admin only)
+        if (newStaffDeptSelect) {
+            newStaffDeptSelect.innerHTML = cachedDepts.map(d => `<option value="${d.dept_code}">${d.name} (${d.dept_code})</option>`).join('');
+        }
+        if (editStaffDeptSelect) {
+            editStaffDeptSelect.innerHTML = cachedDepts.map(d => `<option value="${d.dept_code}">${d.name} (${d.dept_code})</option>`).join('');
+        }
 
         populateDonorsDropdown();
     }
@@ -252,8 +357,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     function populateDonorsDropdown() {
         const donorSelect = document.getElementById('donor_id');
         donorSelect.innerHTML = '<option value="">Select Donor...</option>' + 
-            cachedDonors.map(dn => `<option value="${dn.id}">${dn.name}</option>`).join('');
+            cachedDonors.map(dn => `<option value="${dn.id}">[${dn.donor_code || 'DNR'}] ${dn.name}</option>`).join('');
     }
+
+    // Display unique donor code and phone when selected
+    document.getElementById('donor_id').addEventListener('change', (e) => {
+        const donor = cachedDonors.find(d => d.id === e.target.value);
+        const infoDiv = document.getElementById('donor-quick-info');
+        if (donor) {
+            infoDiv.textContent = `Donor ID: ${donor.donor_code} | Phone: ${donor.phone_number || 'N/A'}`;
+        } else {
+            infoDiv.textContent = '';
+        }
+    });
 
     document.getElementById('item_id').addEventListener('change', (e) => {
         const item = cachedItems.find(i => i.id === e.target.value);
@@ -269,7 +385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 5. AUTO DONATION REF GENERATION
+    // 6. AUTO DONATION REFERENCE NUMBER GENERATOR
     // --------------------------------------------------------------------------
     async function checkAndGenerateDonationRef() {
         const moveType = document.getElementById('movement_type').value;
@@ -315,7 +431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 6. RECORD STOCK MOVEMENT
+    // 7. RECORD STOCK MOVEMENT
     // --------------------------------------------------------------------------
     document.getElementById('movement-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -376,7 +492,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { error } = await supabase.from('stock_movements').insert([payload]);
             if (error) throw error;
 
-            alert('Movement saved successfully! Price and stock updated.');
+            alert('Movement saved successfully!');
             document.getElementById('movement-form').reset();
             document.getElementById('donation-fields').style.display = 'none';
             await loadMasterMetadata();
@@ -390,13 +506,341 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 7. CATALOG & PRICING EDITOR
+    // 8. ADD ITEM, ADD ASSET & PROFILE MODAL SUBMITS
     // --------------------------------------------------------------------------
-    document.getElementById('btn-open-catalog-edit').addEventListener('click', () => {
-        renderCatalogEditor();
-        document.getElementById('modal-catalog-editor').classList.remove('hidden');
+    document.getElementById('form-create-item').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            name: document.getElementById('new_item_name').value.trim(),
+            unit: document.getElementById('new_item_unit').value.trim(),
+            category: document.getElementById('new_item_category').value,
+            reorder_level: parseFloat(document.getElementById('new_item_reorder').value) || 5,
+            standard_cost: parseFloat(document.getElementById('new_item_cost').value) || 0,
+            last_purchase_price: parseFloat(document.getElementById('new_item_cost').value) || 0,
+            is_perishable: document.getElementById('new_item_perishable').checked
+        };
+
+        const { data, error } = await supabase.from('items').insert([payload]).select().single();
+        if (error) {
+            alert('Error adding item: ' + error.message);
+        } else {
+            alert(`Item "${payload.name}" successfully created!`);
+            document.getElementById('form-create-item').reset();
+            hideModal('modal-new-item');
+            await loadMasterMetadata();
+            document.getElementById('item_id').value = data.id;
+        }
     });
 
+    document.getElementById('form-create-asset').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            item_name: document.getElementById('asset_name').value.trim(),
+            department_id: document.getElementById('asset_dept_id').value,
+            acquisition_type: document.getElementById('asset_acq_type').value,
+            condition: document.getElementById('asset_condition').value,
+            cost_or_value: parseFloat(document.getElementById('asset_cost').value) || 0,
+            storage_location: document.getElementById('asset_location').value.trim(),
+            custodian: document.getElementById('asset_custodian').value.trim(),
+            tag_or_serial: document.getElementById('asset_tag').value.trim(),
+            performed_by_name: currentUserName,
+            performed_by_email: currentUserEmail
+        };
+
+        const { error } = await supabase.from('assets').insert([payload]);
+        if (error) {
+            alert('Error saving asset: ' + error.message);
+        } else {
+            alert('Durable asset recorded successfully!');
+            document.getElementById('form-create-asset').reset();
+            hideModal('modal-new-asset');
+            loadAssets();
+        }
+    });
+
+    document.getElementById('form-my-profile').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const updatedName = document.getElementById('my_profile_name').value.trim();
+        if (!updatedName) return;
+
+        currentUserName = updatedName;
+        sessionStorage.setItem('staff_name', updatedName);
+
+        await supabase.from('staff_profiles')
+            .update({ staff_name: updatedName, updated_at: new Date().toISOString() })
+            .eq('email', currentUserEmail);
+
+        document.getElementById('user-display-role').textContent = `${currentUserName} · [${currentUserDeptCode}]`;
+        hideModal('modal-my-profile');
+        alert('Your operator name has been updated.');
+    });
+
+    // --------------------------------------------------------------------------
+    // 9. DONORS DIRECTORY & SORTING (ADMIN ONLY)
+    // --------------------------------------------------------------------------
+    function openDonorEditor(donorId = null) {
+        document.getElementById('form-donor-editor').reset();
+        document.getElementById('edit_donor_id').value = donorId || '';
+
+        if (donorId) {
+            const d = cachedDonors.find(donor => donor.id === donorId);
+            if (d) {
+                document.getElementById('donor_full_name').value = d.name;
+                document.getElementById('donor_phone_number').value = d.phone_number || '';
+                document.getElementById('donor_contact_info').value = d.contact_info || '';
+                document.getElementById('modal-donor-title').textContent = 'Edit Donor Details';
+            }
+        } else {
+            document.getElementById('modal-donor-title').textContent = 'Register New Donor';
+        }
+        showModal('modal-donor-editor');
+    }
+
+    document.getElementById('form-donor-editor').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const donorId = document.getElementById('edit_donor_id').value;
+        const payload = {
+            name: document.getElementById('donor_full_name').value.trim(),
+            phone_number: document.getElementById('donor_phone_number').value.trim(),
+            contact_info: document.getElementById('donor_contact_info').value.trim()
+        };
+
+        let result;
+        if (donorId) {
+            result = await supabase.from('donors').update(payload).eq('id', donorId);
+        } else {
+            result = await supabase.from('donors').insert([payload]);
+        }
+
+        if (result.error) {
+            alert('Error saving donor: ' + result.error.message);
+        } else {
+            alert('Donor profile saved successfully!');
+            hideModal('modal-donor-editor');
+            await loadMasterMetadata();
+            loadDonorsDirectory();
+        }
+    });
+
+    async function loadDonorsDirectory() {
+        if (currentUserDeptCode !== 'AD001') return;
+
+        const tbody = document.getElementById('donors-table-body');
+        const { data, error } = await supabase.from('donor_summary_view').select('*');
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+            return;
+        }
+
+        cachedDonors = data || [];
+        populateDonorsDropdown();
+        renderDonorsTable();
+    }
+
+    function renderDonorsTable() {
+        const tbody = document.getElementById('donors-table-body');
+        const search = document.getElementById('filter-donor-search').value.toLowerCase();
+        const sortBy = document.getElementById('sort-donor-activity').value;
+
+        let filtered = cachedDonors.filter(d => {
+            return !search || 
+                (d.donor_code && d.donor_code.toLowerCase().includes(search)) ||
+                (d.donor_name && d.donor_name.toLowerCase().includes(search)) ||
+                (d.phone_number && d.phone_number.toLowerCase().includes(search));
+        });
+
+        // Sorting by last active donation date
+        filtered.sort((a, b) => {
+            const dateA = a.last_donation_date ? new Date(a.last_donation_date).getTime() : 0;
+            const dateB = b.last_donation_date ? new Date(b.last_donation_date).getTime() : 0;
+
+            if (sortBy === 'LATEST_FIRST') return dateB - dateA;
+            if (sortBy === 'OLDEST_FIRST') return dateA - dateB;
+            if (sortBy === 'NAME_ASC') return a.donor_name.localeCompare(b.donor_name);
+            return 0;
+        });
+
+        if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-gray-400">No donors match criteria.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(d => {
+            const lastDate = d.last_donation_date 
+                ? new Date(d.last_donation_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) 
+                : '<span class="text-gray-400">No donations yet</span>';
+
+            return `
+                <tr class="hover:bg-gray-50 border-b">
+                    <td class="p-2.5 font-mono font-bold text-[#0b3b2c]">${d.donor_code || 'DNR'}</td>
+                    <td class="p-2.5 font-bold text-gray-900">${d.donor_name}</td>
+                    <td class="p-2.5 font-mono text-gray-700">${d.phone_number || '—'}</td>
+                    <td class="p-2.5 text-gray-500">${d.contact_info || '—'}</td>
+                    <td class="p-2.5 font-medium text-emerald-800">${lastDate}</td>
+                    <td class="p-2.5 font-mono font-bold text-center">${d.total_donation_instances || 0}</td>
+                    <td class="p-2.5 text-right">
+                        <button onclick="window.triggerEditDonor('${d.donor_id}')" class="text-xs bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded text-gray-700 font-semibold">Edit Details</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    window.triggerEditDonor = (id) => openDonorEditor(id);
+    document.getElementById('filter-donor-search').addEventListener('input', renderDonorsTable);
+    document.getElementById('sort-donor-activity').addEventListener('change', renderDonorsTable);
+
+    // --------------------------------------------------------------------------
+    // 10. REPLENISHMENT LIST (UNIVERSAL) & EXPORT
+    // --------------------------------------------------------------------------
+    async function loadReplenishmentList() {
+        const tbody = document.getElementById('replenishment-table-body');
+        const budgetElem = document.getElementById('total-market-budget');
+
+        const { data, error } = await supabase.from('replenishment_needed_view').select('*');
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
+            return;
+        }
+
+        if (!data || !data.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-emerald-700 font-semibold">🎉 All items are adequately stocked! No replenishment required.</td></tr>`;
+            budgetElem.textContent = 'Estimated Budget: KES 0.00';
+            return;
+        }
+
+        let totalEst = 0;
+        tbody.innerHTML = data.map(r => {
+            totalEst += Number(r.estimated_cost);
+            const isFarm = r.category === 'Farm Produce';
+            const unitPrice = Number(r.effective_unit_price ?? r.standard_cost ?? 0);
+
+            return `
+                <tr class="hover:bg-amber-50/50 border-b">
+                    <td class="p-2.5 font-bold text-gray-900">${r.item_name}</td>
+                    <td class="p-2.5 text-gray-500">${r.category}</td>
+                    <td class="p-2.5 font-mono text-red-700 font-semibold">${Number(r.current_stock).toFixed(1)} ${r.unit}</td>
+                    <td class="p-2.5 font-mono text-gray-600">${r.reorder_level} ${r.unit}</td>
+                    <td class="p-2.5 font-mono font-black text-[#e85d04]">${Number(r.suggested_reorder_qty).toFixed(1)} ${r.unit}</td>
+                    <td class="p-2.5">
+                        <span class="px-2 py-0.5 rounded text-[11px] font-semibold ${isFarm ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                            ${r.procurement_source || 'Purchase at Market'}
+                        </span>
+                    </td>
+                    <td class="p-2.5 font-mono text-gray-700">KES ${unitPrice.toFixed(2)}</td>
+                    <td class="p-2.5 text-right font-mono font-bold text-[#0b3b2c]">KES ${Number(r.estimated_cost).toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        budgetElem.textContent = `Estimated Market Budget: KES ${totalEst.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+    }
+
+    // --------------------------------------------------------------------------
+    // 11. STAFF & ACCOUNT MANAGEMENT (ADMIN ONLY)
+    // --------------------------------------------------------------------------
+    async function loadStaffAccounts() {
+        if (currentUserDeptCode !== 'AD001') return;
+
+        const tbody = document.getElementById('staff-table-body');
+        const { data, error } = await supabase.from('staff_profiles').select('*').order('dept_code');
+
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+            return;
+        }
+
+        cachedStaff = data || [];
+        tbody.innerHTML = cachedStaff.map(s => `
+            <tr class="hover:bg-gray-50 border-b">
+                <td class="p-2.5 font-mono font-bold text-emerald-950">${s.dept_code}</td>
+                <td class="p-2.5 font-semibold text-gray-800">${s.staff_name}</td>
+                <td class="p-2.5 text-gray-600 font-mono">${s.email}</td>
+                <td class="p-2.5"><span class="px-2 py-0.5 rounded text-xs bg-gray-100 font-medium">${s.role}</span></td>
+                <td class="p-2.5">
+                    <span class="px-2 py-0.5 rounded text-xs font-semibold ${s.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${s.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td class="p-2.5 text-right space-x-1">
+                    <button onclick="window.triggerEditStaff('${s.id}')" class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded text-gray-700 font-semibold">Edit</button>
+                    <button onclick="window.triggerToggleStaff('${s.id}', ${s.is_active})" class="text-xs ${s.is_active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'} px-2 py-1 rounded font-semibold">
+                        ${s.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    document.getElementById('form-create-staff').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            staff_name: document.getElementById('new_staff_name').value.trim(),
+            dept_code: document.getElementById('new_staff_dept').value,
+            role: document.getElementById('new_staff_role').value,
+            email: document.getElementById('new_staff_email').value.trim().toLowerCase(),
+            is_active: true
+        };
+
+        const { error } = await supabase.from('staff_profiles').insert([payload]);
+        if (error) {
+            alert('Error creating staff: ' + error.message);
+        } else {
+            alert('Staff member registered successfully!');
+            document.getElementById('form-create-staff').reset();
+            hideModal('modal-new-staff');
+            loadStaffAccounts();
+        }
+    });
+
+    window.triggerEditStaff = (staffId) => {
+        const staff = cachedStaff.find(s => s.id === staffId);
+        if (!staff) return;
+
+        document.getElementById('edit_staff_id').value = staff.id;
+        document.getElementById('edit_staff_name').value = staff.staff_name;
+        document.getElementById('edit_staff_dept').value = staff.dept_code;
+        document.getElementById('edit_staff_role').value = staff.role;
+        document.getElementById('edit_staff_active').checked = staff.is_active;
+
+        showModal('modal-edit-staff');
+    };
+
+    window.triggerToggleStaff = async (staffId, currentStatus) => {
+        if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this account?`)) return;
+
+        const { error } = await supabase.from('staff_profiles').update({ is_active: !currentStatus }).eq('id', staffId);
+        if (error) {
+            alert('Error updating status: ' + error.message);
+        } else {
+            loadStaffAccounts();
+        }
+    };
+
+    document.getElementById('form-edit-staff').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const staffId = document.getElementById('edit_staff_id').value;
+        const payload = {
+            staff_name: document.getElementById('edit_staff_name').value.trim(),
+            dept_code: document.getElementById('edit_staff_dept').value,
+            role: document.getElementById('edit_staff_role').value,
+            is_active: document.getElementById('edit_staff_active').checked,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase.from('staff_profiles').update(payload).eq('id', staffId);
+        if (error) {
+            alert('Error updating staff: ' + error.message);
+        } else {
+            alert('Staff details updated successfully!');
+            hideModal('modal-edit-staff');
+            loadStaffAccounts();
+        }
+    });
+
+    // --------------------------------------------------------------------------
+    // 12. CATALOG & PRICING EDITOR
+    // --------------------------------------------------------------------------
     function renderCatalogEditor() {
         const tbody = document.getElementById('catalog-editor-table-body');
         tbody.innerHTML = cachedItems.map(item => `
@@ -433,135 +877,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --------------------------------------------------------------------------
-    // 8. DONORS DIRECTORY
-    // --------------------------------------------------------------------------
-    document.getElementById('btn-open-add-donor').addEventListener('click', () => {
-        document.getElementById('form-donor-editor').reset();
-        document.getElementById('edit_donor_id').value = '';
-        document.getElementById('modal-donor-title').textContent = 'Register New Donor';
-        document.getElementById('modal-donor-editor').classList.remove('hidden');
-    });
-
-    document.getElementById('btn-open-new-donor-modal').addEventListener('click', () => {
-        document.getElementById('form-donor-editor').reset();
-        document.getElementById('edit_donor_id').value = '';
-        document.getElementById('modal-donor-title').textContent = 'Register New Donor';
-        document.getElementById('modal-donor-editor').classList.remove('hidden');
-    });
-
-    document.getElementById('form-donor-editor').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const donorId = document.getElementById('edit_donor_id').value;
-        const payload = {
-            name: document.getElementById('donor_full_name').value.trim(),
-            contact_info: document.getElementById('donor_contact_info').value.trim()
-        };
-
-        let result;
-        if (donorId) {
-            result = await supabase.from('donors').update(payload).eq('id', donorId);
-        } else {
-            result = await supabase.from('donors').insert([payload]);
-        }
-
-        if (result.error) {
-            alert('Error saving donor: ' + result.error.message);
-        } else {
-            alert('Donor profile saved successfully!');
-            document.getElementById('modal-donor-editor').classList.add('hidden');
-            await loadMasterMetadata();
-            loadDonorsDirectory();
-        }
-    });
-
-    async function loadDonorsDirectory() {
-        const tbody = document.getElementById('donors-table-body');
-        const { data, error } = await supabase.from('donors').select('*').order('name');
-        if (error) {
-            tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
-            return;
-        }
-
-        cachedDonors = data || [];
-        populateDonorsDropdown();
-
-        if (!cachedDonors.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-gray-400">No donors registered yet.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = cachedDonors.map(d => `
-            <tr class="hover:bg-gray-50 border-b">
-                <td class="p-2.5 font-bold text-gray-900">${d.name}</td>
-                <td class="p-2.5 text-gray-600">${d.contact_info || '—'}</td>
-                <td class="p-2.5 text-gray-400 text-xs">${new Date(d.created_at).toLocaleDateString('en-GB')}</td>
-                <td class="p-2.5 text-right">
-                    <button onclick="window.editDonor('${d.id}')" class="text-xs bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded text-gray-700 font-semibold">Edit Details</button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    window.editDonor = (donorId) => {
-        const d = cachedDonors.find(donor => donor.id === donorId);
-        if (!d) return;
-
-        document.getElementById('edit_donor_id').value = d.id;
-        document.getElementById('donor_full_name').value = d.name;
-        document.getElementById('donor_contact_info').value = d.contact_info || '';
-        document.getElementById('modal-donor-title').textContent = 'Edit Donor Details';
-        document.getElementById('modal-donor-editor').classList.remove('hidden');
-    };
-
-    // --------------------------------------------------------------------------
-    // 9. REPLENISHMENT LIST (BULLETPROOF FALLBACK LOGIC)
-    // --------------------------------------------------------------------------
-    async function loadReplenishmentList() {
-        const tbody = document.getElementById('replenishment-table-body');
-        const budgetElem = document.getElementById('total-market-budget');
-
-        const { data, error } = await supabase.from('replenishment_needed_view').select('*');
-        if (error) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
-            return;
-        }
-
-        if (!data || !data.length) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-emerald-700 font-semibold">🎉 All items are adequately stocked! No orders needed.</td></tr>`;
-            budgetElem.textContent = 'Estimated Budget: KES 0.00';
-            return;
-        }
-
-        let totalEst = 0;
-        tbody.innerHTML = data.map(r => {
-            totalEst += Number(r.estimated_cost);
-            const isFarm = r.category === 'Farm Produce';
-            // Defensive price fallback: uses effective_unit_price, standard_cost, or 0
-            const unitPrice = Number(r.effective_unit_price ?? r.standard_cost ?? 0);
-
-            return `
-                <tr class="hover:bg-amber-50/50 border-b">
-                    <td class="p-2.5 font-bold text-gray-900">${r.item_name}</td>
-                    <td class="p-2.5 text-gray-500">${r.category}</td>
-                    <td class="p-2.5 font-mono text-red-700 font-semibold">${Number(r.current_stock).toFixed(1)} ${r.unit}</td>
-                    <td class="p-2.5 font-mono text-gray-600">${r.reorder_level} ${r.unit}</td>
-                    <td class="p-2.5 font-mono font-black text-[#e85d04]">${Number(r.suggested_reorder_qty).toFixed(1)} ${r.unit}</td>
-                    <td class="p-2.5">
-                        <span class="px-2 py-0.5 rounded text-[11px] font-semibold ${isFarm ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
-                            ${r.procurement_source || 'Purchase at Market'}
-                        </span>
-                    </td>
-                    <td class="p-2.5 font-mono text-gray-700">KES ${unitPrice.toFixed(2)}</td>
-                    <td class="p-2.5 text-right font-mono font-bold text-[#0b3b2c]">KES ${Number(r.estimated_cost).toFixed(2)}</td>
-                </tr>
-            `;
-        }).join('');
-
-        budgetElem.textContent = `Estimated Market Budget: KES ${totalEst.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
-    }
-
-    // --------------------------------------------------------------------------
-    // 10. STOCK BALANCES, MOVEMENT LEDGER & ASSETS
+    // 13. STOCK BALANCES, MOVEMENT LEDGER & ASSETS (WITH DEPARTMENT ISOLATION)
     // --------------------------------------------------------------------------
     async function loadStockBalances() {
         const tbody = document.getElementById('balances-table-body');
@@ -569,6 +885,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             query = query.eq('dept_code', currentUserDeptCode);
+            document.getElementById('stock-scope-desc').textContent = `Showing items earmarked exclusively for [${currentUserDeptCode}]`;
         }
 
         const { data, error } = await query;
@@ -708,6 +1025,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function loadDonationRegister() {
+        if (currentUserDeptCode !== 'AD001') return;
+
         const tbody = document.getElementById('donations-table-body');
         const { data, error } = await supabase.from('donation_register_view').select('*').order('date_received', { ascending: false });
 
@@ -819,39 +1138,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         `).join('');
     }
 
-    async function loadStaffAccounts() {
-        if (currentUserDeptCode !== 'AD001') return;
-
-        const tbody = document.getElementById('staff-table-body');
-        const { data, error } = await supabase.from('staff_profiles').select('*').order('dept_code');
-
-        if (error) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
-            return;
-        }
-
-        cachedStaff = data || [];
-        tbody.innerHTML = cachedStaff.map(s => `
-            <tr class="hover:bg-gray-50 border-b">
-                <td class="p-2.5 font-mono font-bold text-emerald-950">${s.dept_code}</td>
-                <td class="p-2.5 font-semibold text-gray-800">${s.staff_name}</td>
-                <td class="p-2.5 text-gray-600 font-mono">${s.email}</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded text-xs bg-gray-100 font-medium">${s.role}</span></td>
-                <td class="p-2.5">
-                    <span class="px-2 py-0.5 rounded text-xs font-semibold ${s.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                        ${s.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td class="p-2.5 text-right space-x-1">
-                    <button onclick="window.editStaffMember('${s.id}')" class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded text-gray-700">Edit</button>
-                    <button onclick="window.toggleStaffStatus('${s.id}', ${s.is_active})" class="text-xs ${s.is_active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'} px-2 py-1 rounded">
-                        ${s.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
     function setupFilters() {
         ['filter-stock-search', 'filter-stock-dept', 'filter-stock-category', 'filter-stock-health'].forEach(id => {
             const el = document.getElementById(id);
@@ -878,15 +1164,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadActionCentre();
         loadStockBalances();
         loadLedgerRecords();
-        loadDonationRegister();
-        loadAssets();
         loadReplenishmentList();
-        loadDonorsDirectory();
-        if (currentUserDeptCode === 'AD001') loadStaffAccounts();
+        loadAssets();
+        if (currentUserDeptCode === 'AD001') {
+            loadDonationRegister();
+            loadDonorsDirectory();
+            loadStaffAccounts();
+        }
     }
 
     // --------------------------------------------------------------------------
-    // 11. EXPORTS
+    // 14. EXPORTS
     // --------------------------------------------------------------------------
     function downloadCSV(csvContent, fileName) {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -898,6 +1186,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         link.click();
         document.body.removeChild(link);
     }
+
+    // Export Donors Directory (Sorted by Last Active Date)
+    document.getElementById('btn-export-donors').addEventListener('click', async () => {
+        if (currentUserDeptCode !== 'AD001') return;
+        const { data } = await supabase.from('donor_summary_view').select('*').order('last_donation_date', { ascending: false });
+        if (!data || !data.length) return alert('No donors to export.');
+
+        let csv = 'Donor Code,Donor Name,Phone Number,Contact Details,Last Active Donation Date,Total Donations Given\n';
+        data.forEach(d => {
+            csv += `"${d.donor_code}","${d.donor_name}","${d.phone_number || ''}","${d.contact_info || ''}","${d.last_donation_date || 'No Donations'}","${d.total_donation_instances}"\n`;
+        });
+        downloadCSV(csv, `Amys_House_Donors_Directory_${new Date().toISOString().slice(0,10)}.csv`);
+    });
+
+    // Export Replenishment / Market Shopping List
+    document.getElementById('btn-export-replenish').addEventListener('click', async () => {
+        const { data } = await supabase.from('replenishment_needed_view').select('*');
+        if (!data || !data.length) return alert('No replenishment items to export.');
+
+        let csv = 'Item Name,Category,Current Stock,Reorder Level,Recommended Buy Qty,Unit,Procurement Channel,Unit Cost (KES),Total Estimated Budget (KES)\n';
+        data.forEach(r => {
+            const unitPrice = Number(r.effective_unit_price ?? r.standard_cost ?? 0);
+            csv += `"${r.item_name}","${r.category}",${r.current_stock},${r.reorder_level},${r.suggested_reorder_qty},"${r.unit}","${r.procurement_source}",${unitPrice},${r.estimated_cost}\n`;
+        });
+        downloadCSV(csv, `Amys_House_Market_Shopping_List_${new Date().toISOString().slice(0,10)}.csv`);
+    });
 
     document.getElementById('btn-export-stock').addEventListener('click', async () => {
         const { data } = await supabase.from('current_stock_balances').select('*');
@@ -922,6 +1236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById('btn-export-donations').addEventListener('click', async () => {
+        if (currentUserDeptCode !== 'AD001') return;
         const { data } = await supabase.from('donation_register_view').select('*');
         if (!data || !data.length) return alert('No donations to export.');
 
@@ -944,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 12. ONLINE / OFFLINE STATUS
+    // 15. NETWORK STATUS
     // --------------------------------------------------------------------------
     const syncStatus = document.getElementById('sync-status');
     window.addEventListener('online', () => {

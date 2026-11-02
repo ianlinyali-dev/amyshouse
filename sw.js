@@ -1,4 +1,5 @@
-const CACHE_NAME = 'amys-house-v2'; // Bumped version
+// BUMPED VERSION TO CLEAR OLD PWA CACHE
+const CACHE_NAME = 'amys-house-v3'; 
 const ASSETS = [
   '/',
   '/index.html',
@@ -9,8 +10,16 @@ const ASSETS = [
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
-self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS))));
-self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then(k => Promise.all(k.map(key => key !== CACHE_NAME ? caches.delete(key) : null)))));
+self.addEventListener('install', (e) => {
+  self.skipWaiting(); // Force new service worker to activate immediately
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then(k => Promise.all(k.map(key => key !== CACHE_NAME ? caches.delete(key) : null))));
+  self.clients.claim(); // Take control of all pages immediately
+});
+
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request).then(res => res || caches.match('/index.html')))

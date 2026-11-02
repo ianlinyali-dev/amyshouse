@@ -1,19 +1,16 @@
-// INITIALIZE SUPABASE
 const SUPABASE_URL = 'https://vjdqfgjbibocgorruhfj.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_IX8R_VHKZ5pBLokFhl1lxA_JC2ya20s';
 
-// Wait for the browser to fully load the HTML before running ANY code
 document.addEventListener('DOMContentLoaded', () => {
     
     if (!window.supabase) {
-        alert("CRITICAL ERROR: Supabase library did not load from the internet.");
+        alert("CRITICAL ERROR: Supabase library did not load. Check internet.");
         return;
     }
 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentUserProfile = null;
 
-    // DOM Elements
     const authSection = document.getElementById('auth-section');
     const dashSection = document.getElementById('dashboard-section');
     const adminPanel = document.getElementById('admin-panel');
@@ -21,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const loginBtn = document.getElementById('login-submit-btn');
 
-    // Handle Network Status
+    // Network tracking
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     function updateOnlineStatus() {
@@ -36,17 +33,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Handle Authentication Changes
+    // Session Management
     supabase.auth.onAuthStateChange(async (event, session) => {
         if (session) {
             try {
                 const { data, error } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
-                
                 if (error) throw new Error(error.message);
-                if (!data) throw new Error("Profile not found in database.");
 
                 currentUserProfile = data;
-                
                 authSection.classList.add('hidden');
                 dashSection.classList.remove('hidden');
                 logoutBtn.classList.remove('hidden');
@@ -60,8 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 initializeApp();
             } catch (err) {
-                console.error("Auth Load Error:", err);
-                alert(`Error loading profile: ${err.message}. Logging out...`);
+                console.error(err);
+                alert("Login Error: User profile missing. Inform Admin.");
                 supabase.auth.signOut();
             }
         } else {
@@ -73,40 +67,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Login Form Submission
+    // Login Form - Secretly translates Workspace Dropdown into an email
     loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault(); // Stop page from refreshing
+        e.preventDefault();
         
-        const email = document.getElementById('auth-email').value;
+        const username = document.getElementById('auth-username').value; // e.g. 'admin'
         const password = document.getElementById('auth-password').value;
         
-        loginBtn.textContent = 'Checking...';
+        // This hides the email system completely from the user!
+        const dummyEmail = `${username}@amyshouse.local`;
+        
+        loginBtn.textContent = 'Opening Workspace...';
         loginBtn.disabled = true;
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            const { error } = await supabase.auth.signInWithPassword({ email: dummyEmail, password: password });
             
             if (error) {
-                alert("Login Failed: " + error.message);
-                loginBtn.textContent = 'Sign In';
+                alert("Access Denied: Incorrect Password.");
+                loginBtn.textContent = 'Enter Workspace';
                 loginBtn.disabled = false;
             }
-            // If successful, onAuthStateChange takes over automatically
         } catch (err) {
-            alert("Connection Error: " + err.message);
-            loginBtn.textContent = 'Sign In';
+            alert("Connection Error.");
+            loginBtn.textContent = 'Enter Workspace';
             loginBtn.disabled = false;
         }
     });
 
-    // Logout
     logoutBtn.addEventListener('click', async () => {
         await supabase.auth.signOut();
-        loginBtn.textContent = 'Sign In';
+        loginBtn.textContent = 'Enter Workspace';
         loginBtn.disabled = false;
     });
 
-    // Load App Data
     async function initializeApp() {
         await loadDropdowns();
         await loadStockBalances();
@@ -134,9 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 (depts || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
             document.getElementById('donor_id').innerHTML = '<option value="">Select...</option>' + 
                 (donors || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-        } catch (e) { 
-            console.warn("Dropdown load failed", e); 
-        }
+        } catch (e) { console.warn("Dropdown load failed"); }
     }
 
     async function loadStockBalances() {
@@ -162,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // Submit Movement
     document.getElementById('movement-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const isDonation = document.getElementById('movement_type').value === 'Donation';
@@ -210,7 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Admin Table
     async function loadAdminUsersTable() {
         const { data, error } = await supabase.from('user_profiles').select('*');
         if (error) return;
@@ -218,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tbody = document.getElementById('admin-users-table');
         tbody.innerHTML = data.map(user => `
             <tr>
-                <td class="p-2 text-xs">${user.generic_email || 'Unknown'}</td>
+                <td class="p-2 text-xs font-bold">${(user.generic_email || '').replace('@amyshouse.local', '')}</td>
                 <td class="p-2 text-xs font-semibold text-[#e85d04] uppercase">${user.role}</td>
                 <td class="p-2 text-xs">
                     <input type="text" id="staff-name-${user.id}" value="${user.current_staff_name}" class="border rounded p-1 w-full">
@@ -229,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>
         `).join('');
 
-        // Attach listeners dynamically to the new buttons
         document.querySelectorAll('.admin-update-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const userId = e.target.getAttribute('data-userid');

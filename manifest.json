@@ -1,0 +1,16 @@
+{
+  "name": "MSCP Amy's House Inventory",
+  "short_name": "Amy's Store",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#fcfbf9",
+  "theme_color": "#0b3b2c",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

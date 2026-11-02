@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSCP Amy's House Inventory</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b3b2c">
+    <link rel="apple-touch-icon" href="logo.png">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-[#fcfbf9] text-gray-800 antialiased min-h-screen flex flex-col">
+
+    <header class="bg-[#0b3b2c] text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="logo.png" alt="MSCP" class="w-10 h-10 object-contain rounded-md bg-white/10 p-1">
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Amy's House Store</h1>
+                    <p id="user-display-role" class="text-xs text-[#e85d04] font-medium tracking-wider uppercase">MSCP Phase 1</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span id="sync-status" class="text-xs bg-green-700/60 px-2 py-1 rounded text-emerald-100">Online</span>
+                <button id="logout-btn" class="hidden text-xs underline hover:text-[#e85d04]">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Authentication Screen -->
+    <main id="auth-section" class="flex-grow flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100 w-full max-w-md">
+            <h2 class="text-2xl font-bold text-[#0b3b2c] mb-6 text-center">Staff Login</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600">Department / Role Email</label>
+                    <input type="email" id="auth-email" required placeholder="e.g. store@amyshouse.org" class="w-full p-2 border rounded mt-1">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600">Password</label>
+                    <input type="password" id="auth-password" required class="w-full p-2 border rounded mt-1">
+                </div>
+                <button type="submit" class="w-full bg-[#e85d04] hover:bg-[#d05203] text-white font-bold py-2.5 rounded shadow">Sign In</button>
+            </form>
+        </div>
+    </main>
+
+    <!-- Main Workspace -->
+    <main id="dashboard-section" class="hidden flex-grow max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Admin Panel (Only visible to Admin) -->
+        <section id="admin-panel" class="hidden lg:col-span-3 bg-emerald-50 border border-emerald-200 p-4 rounded-xl shadow-sm mb-2">
+            <h2 class="text-md font-bold text-[#0b3b2c] mb-3">Admin Controls: Staff Assignment</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm bg-white rounded shadow-sm">
+                    <thead class="bg-emerald-100 text-[#0b3b2c] text-xs uppercase">
+                        <tr>
+                            <th class="p-2">Login Email (Role)</th>
+                            <th class="p-2">Role Type</th>
+                            <th class="p-2">Current Staff Name</th>
+                            <th class="p-2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-table" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Left: Record Movement -->
+        <section class="bg-white p-5 rounded-xl shadow-sm border border-emerald-900/10 lg:col-span-1 h-fit">
+            <h2 class="text-md font-bold text-[#0b3b2c] mb-4 border-b pb-2">Record Movement</h2>
+            <form id="movement-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Type</label>
+                    <select id="movement_type" required class="w-full p-2 border rounded text-sm bg-gray-50">
+                        <option value="">Choose...</option>
+                        <option value="Purchase">Purchase (In)</option>
+                        <option value="Donation">Donation (In)</option>
+                        <option value="Weekly supply">Weekly supply (Out)</option>
+                        <option value="Top-up">Top-up (Out)</option>
+                        <option value="Issue to department">Issue to dept (Out)</option>
+                    </select>
+                </div>
+
+                <div id="donation-fields" class="hidden space-y-3 bg-orange-50 p-3 rounded border border-orange-100">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600">Donor</label>
+                        <select id="donor_id" class="w-full p-2 border rounded text-sm"><option value="">Select Donor...</option></select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600">Ref No.</label>
+                            <input type="text" id="donation_ref" placeholder="e.g. AH/DR/001" class="w-full p-2 border rounded text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600">Condition</label>
+                            <select id="item_condition" class="w-full p-2 border rounded text-sm">
+                                <option value="Good">Good</option>
+                                <option value="Fair">Fair</option>
+                                <option value="Damaged">Damaged</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Item</label>
+                    <select id="item_id" required class="w-full p-2 border rounded text-sm bg-gray-50"><option value="">Loading...</option></select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Whose Stock / Earmark</label>
+                    <select id="department_id" required class="w-full p-2 border rounded text-sm bg-gray-50"><option value="">Loading...</option></select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Direction</label>
+                        <select id="direction" required class="w-full p-2 border rounded text-sm bg-gray-50">
+                            <option value="In">In (+)</option>
+                            <option value="Out">Out (-)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Qty</label>
+                        <input type="number" id="quantity" step="0.01" min="0.01" required placeholder="0" class="w-full p-2 border rounded text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Reason / Notes</label>
+                    <input type="text" id="reason" placeholder="e.g. Baking / Event" class="w-full p-2 border rounded text-sm">
+                </div>
+
+                <button type="submit" class="w-full bg-[#0b3b2c] hover:bg-[#07281c] text-white font-medium p-2.5 rounded shadow">Save Entry</button>
+            </form>
+        </section>
+
+        <!-- Right: Balances -->
+        <section class="lg:col-span-2 space-y-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-emerald-900/10">
+                <h2 class="text-md font-bold text-[#0b3b2c] mb-3">Live Stock Balances</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-emerald-50 text-[#0b3b2c] text-xs uppercase border-b border-emerald-100">
+                            <tr>
+                                <th class="p-2.5">Item</th>
+                                <th class="p-2.5">Dept. Owner</th>
+                                <th class="p-2.5">Balance</th>
+                                <th class="p-2.5">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="balances-table-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

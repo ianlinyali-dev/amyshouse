@@ -1,9 +1,14 @@
-// YOUR NEW SUPABASE CREDENTIALS
+// YOUR CURRENT SUPABASE CREDENTIALS
 const SUPABASE_URL = 'https://sfrgoujuwmctssszndrs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_zm8UZ9x6LlQwr-UdCziZ0g_7DbJvBbq';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     
+    // Register Service Worker explicitly for GitHub Pages
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log("SW Reg Error:", err));
+    }
+
     if (!window.supabase) {
         alert("CRITICAL ERROR: Supabase library did not load. Check internet.");
         return;
@@ -19,99 +24,85 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const loginBtn = document.getElementById('login-submit-btn');
 
-    // Network tracking
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    function updateOnlineStatus() {
-        const statusSpan = document.getElementById('sync-status');
-        if (navigator.onLine) {
-            statusSpan.textContent = 'Online';
-            statusSpan.className = 'text-xs bg-green-700/60 px-2 py-1 rounded text-emerald-100';
-            syncOfflineQueue();
-        } else {
-            statusSpan.textContent = 'Offline (Local)';
-            statusSpan.className = 'text-xs bg-red-600 px-2 py-1 rounded text-white';
-        }
+    // --- 1. Check if user is already logged in on refresh ---
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+        await transitionToDashboard(session);
     }
 
-    // Session Management
-    supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session) {
-            try {
-                const { data, error } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
-                if (error) throw new Error(error.message);
-                if (!data) throw new Error("User profile missing. Inform Admin.");
-
-                currentUserProfile = data;
-                authSection.classList.add('hidden');
-                dashSection.classList.remove('hidden');
-                logoutBtn.classList.remove('hidden');
-                
-                document.getElementById('user-display-role').textContent = `Logged in: ${data.current_staff_name} (${data.role})`;
-
-                if (data.role === 'admin') {
-                    adminPanel.classList.remove('hidden');
-                    loadAdminUsersTable();
-                }
-
-                initializeApp();
-            } catch (err) {
-                console.error(err);
-                alert("Login Error: " + err.message);
-                supabase.auth.signOut();
-                
-                // FIX: This unfreezes the button if the profile fails to load
-                loginBtn.textContent = 'Enter Workspace';
-                loginBtn.disabled = false;
-            }
-        } else {
-            authSection.classList.remove('hidden');
-            dashSection.classList.add('hidden');
-            logoutBtn.classList.add('hidden');
-            adminPanel.classList.add('hidden');
-            currentUserProfile = null;
-        }
-    });
-
-    // Login Form - Secretly translates Workspace Dropdown into an email
+    // --- 2. Handle Login Button Click ---
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const username = document.getElementById('auth-username').value; 
         const password = document.getElementById('auth-password').value;
         
-        if (!username) {
-            alert("Please select a workspace.");
-            return;
-        }
+        if (!username) return alert("Please select a workspace.");
 
         const dummyEmail = `${username}@amyshouse.local`;
         
-        loginBtn.textContent = 'Opening Workspace...';
+        loginBtn.textContent = 'Authenticating...';
         loginBtn.disabled = true;
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({ email: dummyEmail, password: password });
+            // Attempt to log in
+            const { data, error } = await supabase.auth.signInWithPassword({ email: dummyEmail, password: password });
             
-            if (error) {
-                alert("Access Denied: Incorrect Password.");
-                loginBtn.textContent = 'Enter Workspace';
-                loginBtn.disabled = false;
-            }
-            // If successful, onAuthStateChange takes over automatically
+            if (error) throw new Error(error.message);
+
+            // If login works, manually trigger the UI switch
+            await transitionToDashboard(data.session);
+
         } catch (err) {
-            alert("Connection Error. Please try again.");
+            alert("Login Failed: " + err.message);
             loginBtn.textContent = 'Enter Workspace';
             loginBtn.disabled = false;
         }
     });
 
+    // --- 3. Central UI Transition Logic ---
+    async function transitionToDashboard(session) {
+        loginBtn.textContent = 'Loading Profile...';
+        
+        try {
+            // Fetch User Profile
+            const { data, error } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
+            
+            if (error) throw new Error("Database error reading profile.");
+            if (!data) throw new Error("Profile is missing from database.");
+
+            currentUserProfile = data;
+            
+            // Switch UI screens
+            authSection.classList.add('hidden');
+            dashSection.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
+            
+            document.getElementById('user-display-role').textContent = `Logged in: ${data.current_staff_name} (${data.role})`;
+
+            if (data.role === 'admin') {
+                adminPanel.classList.remove('hidden');
+                loadAdminUsersTable();
+            }
+
+            // Load application data
+            initializeApp();
+
+        } catch (err) {
+            alert("Dashboard Error: " + err.message);
+            await supabase.auth.signOut();
+            loginBtn.textContent = 'Enter Workspace';
+            loginBtn.disabled = false;
+        }
+    }
+
+    // --- 4. Logout Logic ---
     logoutBtn.addEventListener('click', async () => {
         await supabase.auth.signOut();
-        loginBtn.textContent = 'Enter Workspace';
-        loginBtn.disabled = false;
+        window.location.reload(); // Refreshing the page safely resets everything
     });
 
+    // --- 5. Application Functions ---
     async function initializeApp() {
         await loadDropdowns();
         await loadStockBalances();
@@ -139,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 (depts || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
             document.getElementById('donor_id').innerHTML = '<option value="">Select...</option>' + 
                 (donors || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-        } catch (e) { console.warn("Dropdown load failed"); }
+        } catch (e) { console.warn("Dropdown load failed", e); }
     }
 
     async function loadStockBalances() {
@@ -167,4 +158,69 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('movement-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const isDonation = document.getEle
+        const isDonation = document.getElementById('movement_type').value === 'Donation';
+        
+        const payload = {
+            movement_type: document.getElementById('movement_type').value,
+            item_id: document.getElementById('item_id').value,
+            department_id: document.getElementById('department_id').value,
+            direction: document.getElementById('direction').value,
+            quantity: parseFloat(document.getElementById('quantity').value),
+            reason: document.getElementById('reason').value,
+            performed_by_name: currentUserProfile ? `${currentUserProfile.current_staff_name} (${currentUserProfile.role})` : 'Offline User',
+            donor_id: isDonation ? document.getElementById('donor_id').value || null : null,
+            donation_ref: isDonation ? document.getElementById('donation_ref').value : null,
+            item_condition: isDonation ? document.getElementById('item_condition').value : null
+        };
+
+        if (!navigator.onLine) {
+            let queue = JSON.parse(localStorage.getItem('offline_queue') || '[]');
+            queue.push(payload);
+            localStorage.setItem('offline_queue', JSON.stringify(queue));
+            alert('Offline mode: Saved locally.');
+            e.target.reset();
+            return;
+        }
+
+        const { error } = await supabase.from('stock_movements').insert([payload]);
+        if (error) alert("Error saving: " + error.message);
+        else {
+            alert('Saved successfully!');
+            e.target.reset();
+            document.getElementById('donation-fields').classList.add('hidden');
+            loadStockBalances();
+        }
+    });
+
+    async function loadAdminUsersTable() {
+        const { data, error } = await supabase.from('user_profiles').select('*');
+        if (error) return;
+        
+        const tbody = document.getElementById('admin-users-table');
+        tbody.innerHTML = data.map(user => `
+            <tr>
+                <td class="p-2 text-xs font-bold">${(user.generic_email || '').replace('@amyshouse.local', '')}</td>
+                <td class="p-2 text-xs font-semibold text-[#e85d04] uppercase">${user.role}</td>
+                <td class="p-2 text-xs">
+                    <input type="text" id="staff-name-${user.id}" value="${user.current_staff_name}" class="border rounded p-1 w-full">
+                </td>
+                <td class="p-2 text-xs">
+                    <button class="admin-update-btn bg-[#0b3b2c] hover:bg-emerald-900 text-white px-2 py-1 rounded transition" data-userid="${user.id}">Update</button>
+                </td>
+            </tr>
+        `).join('');
+
+        document.querySelectorAll('.admin-update-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const userId = e.target.getAttribute('data-userid');
+                const newName = document.getElementById(`staff-name-${userId}`).value;
+                const { error } = await supabase.from('user_profiles').update({ current_staff_name: newName }).eq('id', userId);
+                if (error) alert("Error updating: " + error.message);
+                else alert("Staff name updated!");
+            });
+        });
+    }
+
+    window.addEventListener('online', () => document.getElementById('sync-status').textContent = 'Online');
+    window.addEventListener('offline', () => document.getElementById('sync-status').textContent = 'Offline (Local)');
+});

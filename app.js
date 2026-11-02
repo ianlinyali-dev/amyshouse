@@ -1,5 +1,5 @@
 // ==============================================================================
-// MSCP AMY'S HOUSE INVENTORY SYSTEM - JAVASCRIPT CONTROLLER
+// MSCP AMY'S HOUSE INVENTORY SYSTEM - CONTROLLER WITH AUDITING & FILTERS
 // ==============================================================================
 
 const SUPABASE_URL = 'https://sfrgoujuwmctssszndrs.supabase.co';
@@ -7,30 +7,37 @@ const SUPABASE_ANON_KEY = 'sb_publishable_zm8UZ9x6LlQwr-UdCziZ0g_7DbJvBbq';
 
 document.addEventListener('DOMContentLoaded', async () => {
 
-    // Register Service Worker for offline capability
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration:', err));
     }
 
     if (!window.supabase) {
-        alert('Critical error: Supabase CDN could not be loaded. Check internet connection.');
+        alert('Critical error: Supabase CDN failed to load. Check your internet connection.');
         return;
     }
 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Global in-memory data cache
+    // Global in-memory state
     let cachedItems = [];
     let cachedDepts = [];
     let cachedDonors = [];
-    let currentUserDeptCode = '';
+    let cachedBalances = [];
+    let cachedMovements = [];
+    let cachedDonations = [];
+    let cachedAssets = [];
+    let cachedStaff = [];
+
     let currentUserName = '';
+    let currentUserDeptCode = '';
+    let currentUserEmail = '';
 
     // DOM Elements
     const authSection = document.getElementById('auth-section');
     const dashSection = document.getElementById('dashboard-section');
     const appNavTabs = document.getElementById('app-nav-tabs');
     const logoutBtn = document.getElementById('logout-btn');
+    const myProfileBtn = document.getElementById('btn-edit-my-profile');
     const loginForm = document.getElementById('login-form');
     const errorBox = document.getElementById('login-error-box');
 
@@ -40,10 +47,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const savedStaffName = sessionStorage.getItem('staff_name');
     const savedDeptCode = sessionStorage.getItem('dept_code');
+    const savedEmail = sessionStorage.getItem('staff_email');
 
     if (session && savedStaffName && savedDeptCode) {
         currentUserName = savedStaffName;
         currentUserDeptCode = savedDeptCode;
+        currentUserEmail = savedEmail || `${savedDeptCode.toLowerCase()}@amyshouse.org`;
         initDashboard();
     }
 
@@ -56,12 +65,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const password = document.getElementById('auth-password').value;
 
         if (!deptCode || !staffName) {
-            errorBox.textContent = 'Please choose a department and input your name.';
+            errorBox.textContent = 'Please choose a department and input your staff name.';
             errorBox.style.display = 'block';
             return;
         }
 
-        // Resolves to format: ad001@amyshouse.org
         const email = `${deptCode.toLowerCase()}@amyshouse.org`;
         const submitBtn = document.getElementById('login-submit-btn');
         submitBtn.textContent = 'Verifying...';
@@ -69,12 +77,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) throw new Error('Invalid Department PIN or credentials: ' + error.message);
+            if (error) throw new Error('Invalid Department PIN or Password: ' + error.message);
 
             sessionStorage.setItem('staff_name', staffName);
             sessionStorage.setItem('dept_code', deptCode);
+            sessionStorage.setItem('staff_email', email);
+
             currentUserName = staffName;
             currentUserDeptCode = deptCode;
+            currentUserEmail = email;
 
             initDashboard();
         } catch (err) {
@@ -96,19 +107,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         dashSection.style.display = 'block';
         appNavTabs.style.display = 'block';
         logoutBtn.style.display = 'inline-block';
+        myProfileBtn.style.display = 'inline-block';
 
-        const roleTitle = currentUserDeptCode === 'AD001' 
-            ? 'Executive Admin (Dorothy)' 
+        const isAdmin = currentUserDeptCode === 'AD001';
+        const roleTitle = isAdmin 
+            ? 'Executive Admin' 
             : currentUserDeptCode === 'ST001' 
             ? 'Central Storekeeper' 
-            : `Department Operator [${currentUserDeptCode}]`;
+            : `Department User [${currentUserDeptCode}]`;
 
         document.getElementById('user-display-role').textContent = `${currentUserName} · ${roleTitle}`;
 
+        // Show Admin Only tabs
+        if (isAdmin) {
+            document.getElementById('nav-btn-accounts').style.display = 'flex';
+        }
+
         setupTabNavigation();
         loadMasterMetadata();
+        setupFilters();
         refreshAllViews();
     }
+
+    // Edit Profile Modal Handling
+    myProfileBtn.addEventListener('click', () => {
+        document.getElementById('my_profile_name').value = currentUserName;
+        document.getElementById('my_profile_dept').value = `${currentUserDeptCode} (${currentUserEmail})`;
+        document.getElementById('modal-my-profile').classList.remove('hidden');
+    });
+
+    document.getElementById('form-my-profile').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const updatedName = document.getElementById('my_profile_name').value.trim();
+        if (!updatedName) return;
+
+        currentUserName = updatedName;
+        sessionStorage.setItem('staff_name', updatedName);
+
+        // Update database profile
+        await supabase.from('staff_profiles')
+            .update({ staff_name: updatedName, updated_at: new Date().toISOString() })
+            .eq('email', currentUserEmail);
+
+        document.getElementById('user-display-role').textContent = `${currentUserName} · [${currentUserDeptCode}]`;
+        document.getElementById('modal-my-profile').classList.add('hidden');
+        alert('Your operator name has been updated.');
+    });
 
     // --------------------------------------------------------------------------
     // 2. TAB NAVIGATION
@@ -124,18 +168,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const targetId = btn.getAttribute('data-tab');
                 document.getElementById(targetId).classList.remove('hidden');
 
-                // Refresh specific tables on switch
                 if (targetId === 'tab-stock') loadStockBalances();
                 if (targetId === 'tab-ledger') loadLedgerRecords();
                 if (targetId === 'tab-donations') loadDonationRegister();
                 if (targetId === 'tab-assets') loadAssets();
                 if (targetId === 'tab-replenishment') loadReplenishmentList();
+                if (targetId === 'tab-accounts') loadStaffAccounts();
             });
         });
     }
 
     // --------------------------------------------------------------------------
-    // 3. MASTER DATA LOADERS & MODALS
+    // 3. MASTER METADATA & MODAL CONTROLLERS
     // --------------------------------------------------------------------------
     async function loadMasterMetadata() {
         try {
@@ -156,33 +200,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function populateDropdowns() {
-        // Items Dropdown
         const itemSelect = document.getElementById('item_id');
         itemSelect.innerHTML = '<option value="">Select Item...</option>' + 
             cachedItems.map(i => `<option value="${i.id}">${i.name} (${i.unit})${i.is_perishable ? ' [Perishable]' : ''}</option>`).join('');
 
-        // Department Dropdowns
         const deptSelect = document.getElementById('department_id');
         const assetDeptSelect = document.getElementById('asset_dept_id');
         const filterStockDept = document.getElementById('filter-stock-dept');
+        const filterLedgerDept = document.getElementById('filter-ledger-dept');
+        const filterAssetsDept = document.getElementById('filter-assets-dept');
+        const editStaffDept = document.getElementById('edit_staff_dept');
 
         const deptOptions = '<option value="">Select Department...</option>' + 
             cachedDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
 
         deptSelect.innerHTML = deptOptions;
         assetDeptSelect.innerHTML = deptOptions;
+        if (editStaffDept) {
+            editStaffDept.innerHTML = cachedDepts.map(d => `<option value="${d.dept_code}">${d.name} (${d.dept_code})</option>`).join('');
+        }
 
-        // Populate stock filter
-        filterStockDept.innerHTML = '<option value="ALL">All Departments</option>' + 
+        const filterOptions = '<option value="ALL">All Departments</option>' + 
             cachedDepts.map(d => `<option value="${d.dept_code}">${d.name}</option>`).join('');
 
-        // Donors Dropdown
+        filterStockDept.innerHTML = filterOptions;
+        filterLedgerDept.innerHTML = filterOptions;
+        filterAssetsDept.innerHTML = filterOptions;
+
         const donorSelect = document.getElementById('donor_id');
         donorSelect.innerHTML = '<option value="">Select Donor...</option>' + 
             cachedDonors.map(dn => `<option value="${dn.id}">${dn.name}</option>`).join('');
     }
 
-    // Modal Triggers
     document.getElementById('btn-open-new-item-modal').addEventListener('click', () => {
         document.getElementById('modal-new-item').classList.remove('hidden');
     });
@@ -195,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('modal-new-asset').classList.remove('hidden');
     });
 
-    // Create New Item Form Handler
+    // Create New Item Form
     document.getElementById('form-create-item').addEventListener('submit', async (e) => {
         e.preventDefault();
         const payload = {
@@ -219,7 +268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Create New Donor Form Handler
+    // Create New Donor Form
     document.getElementById('form-create-donor').addEventListener('submit', async (e) => {
         e.preventDefault();
         const payload = {
@@ -239,7 +288,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Movement Form Dynamic Changes
+    // Movement Form UI Dynamics
     document.getElementById('movement_type').addEventListener('change', (e) => {
         const val = e.target.value;
         const donationFields = document.getElementById('donation-fields');
@@ -260,7 +309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 4. RECORD STOCK MOVEMENT SUBMIT
+    // 4. RECORD STOCK MOVEMENT (Fixed schema harmonization & audit trail)
     // --------------------------------------------------------------------------
     document.getElementById('movement-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -273,6 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const quantity = parseFloat(document.getElementById('quantity').value);
         const unitPrice = parseFloat(document.getElementById('unit_price').value) || 0;
         const totalCost = unitPrice * quantity;
+        const reasonText = document.getElementById('reason').value.trim();
 
         // Prevent Negative Balance Check on Out Movements
         if (direction === 'Out') {
@@ -281,7 +331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 .select('balance')
                 .eq('item_id', itemId)
                 .eq('department_id', deptId)
-                .single();
+                .maybeSingle();
 
             const currentAvailable = balanceCheck ? balanceCheck.balance : 0;
             if (quantity > currentAvailable) {
@@ -291,6 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
+        // Full payload with audit trail & both reason/notes populated
         const payload = {
             item_id: itemId,
             department_id: deptId,
@@ -301,11 +352,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             total_cost: totalCost,
             reason_category: document.getElementById('reason_category').value || null,
             people_count: parseInt(document.getElementById('people_count').value) || null,
-            reason: document.getElementById('reason').value || null,
+            reason: reasonText || null,
+            notes: reasonText || null,
             expiry_date: document.getElementById('expiry_date').value || null,
-            performed_by_name: `${currentUserName} (${currentUserDeptCode})`,
 
-            // Donation Specifics
+            // Audit columns: Exactly who is logged in and performed the action
+            performed_by_name: currentUserName,
+            performed_by_email: currentUserEmail,
+            performed_by_dept: currentUserDeptCode,
+
+            // Donation details
             donor_id: isDonation ? document.getElementById('donor_id').value || null : null,
             donation_ref: isDonation ? document.getElementById('donation_ref').value || null : null,
             donor_intent: isDonation ? (moveType.includes('Amy') ? 'Unrestricted' : 'Department Specific') : null,
@@ -320,7 +376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { error } = await supabase.from('stock_movements').insert([payload]);
             if (error) throw error;
 
-            alert('Movement recorded successfully!');
+            alert('Movement saved successfully!');
             document.getElementById('movement-form').reset();
             document.getElementById('donation-fields').style.display = 'none';
             refreshAllViews();
@@ -346,7 +402,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             cost_or_value: parseFloat(document.getElementById('asset_cost').value) || 0,
             storage_location: document.getElementById('asset_location').value.trim(),
             custodian: document.getElementById('asset_custodian').value.trim(),
-            tag_or_serial: document.getElementById('asset_tag').value.trim()
+            tag_or_serial: document.getElementById('asset_tag').value.trim(),
+            performed_by_name: currentUserName,
+            performed_by_email: currentUserEmail
         };
 
         const { error } = await supabase.from('assets').insert([payload]);
@@ -362,11 +420,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadAssets() {
         const tbody = document.getElementById('assets-table-body');
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center p-4 text-gray-400">Loading assets...</td></tr>';
-
         let query = supabase.from('assets').select('*, departments(name, dept_code)').order('created_at', { ascending: false });
 
-        // Scoped for department users
         if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             const dept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
             if (dept) query = query.eq('department_id', dept.id);
@@ -374,16 +429,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { data, error } = await query;
         if (error) {
-            tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
             return;
         }
 
-        if (!data || !data.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-gray-400">No durable assets registered yet.</td></tr>';
+        cachedAssets = data || [];
+        renderAssetsTable();
+    }
+
+    function renderAssetsTable() {
+        const tbody = document.getElementById('assets-table-body');
+        const search = document.getElementById('filter-assets-search').value.toLowerCase();
+        const dept = document.getElementById('filter-assets-dept').value;
+        const condition = document.getElementById('filter-assets-condition').value;
+        const acq = document.getElementById('filter-assets-acq').value;
+
+        const filtered = cachedAssets.filter(a => {
+            const matchesSearch = !search || 
+                a.item_name.toLowerCase().includes(search) || 
+                (a.custodian && a.custodian.toLowerCase().includes(search)) ||
+                (a.tag_or_serial && a.tag_or_serial.toLowerCase().includes(search));
+            const matchesDept = dept === 'ALL' || a.departments?.dept_code === dept;
+            const matchesCond = condition === 'ALL' || a.condition === condition;
+            const matchesAcq = acq === 'ALL' || a.acquisition_type === acq;
+            return matchesSearch && matchesDept && matchesCond && matchesAcq;
+        });
+
+        if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400">No matching assets found.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = data.map(a => `
+        tbody.innerHTML = filtered.map(a => `
             <tr class="hover:bg-gray-50 border-b">
                 <td class="p-2.5 font-bold text-[#0b3b2c]">${a.item_name}</td>
                 <td class="p-2.5 text-xs text-gray-600">${a.departments?.name || 'Central'}</td>
@@ -397,22 +474,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td class="p-2.5 text-xs">${a.storage_location}</td>
                 <td class="p-2.5 text-xs font-medium">${a.custodian}</td>
                 <td class="p-2.5 text-xs font-mono text-gray-500">${a.tag_or_serial || '—'}</td>
+                <td class="p-2.5 text-xs text-gray-600">${a.performed_by_name} <span class="text-gray-400">(${a.performed_by_email})</span></td>
             </tr>
         `).join('');
     }
 
     // --------------------------------------------------------------------------
-    // 6. LIVE STOCK BALANCES VIEW
+    // 6. LIVE STOCK BALANCES VIEW & FILTERS
     // --------------------------------------------------------------------------
     async function loadStockBalances() {
         const tbody = document.getElementById('balances-table-body');
-        const filterDept = document.getElementById('filter-stock-dept').value;
-
         let query = supabase.from('current_stock_balances').select('*').order('item_name');
 
-        if (filterDept !== 'ALL') {
-            query = query.eq('dept_code', filterDept);
-        } else if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+        if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             query = query.eq('dept_code', currentUserDeptCode);
         }
 
@@ -422,12 +496,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        if (!data || !data.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-400">No stock movements found.</td></tr>`;
+        cachedBalances = data || [];
+        renderStockBalancesTable();
+    }
+
+    function renderStockBalancesTable() {
+        const tbody = document.getElementById('balances-table-body');
+        const search = document.getElementById('filter-stock-search').value.toLowerCase();
+        const dept = document.getElementById('filter-stock-dept').value;
+        const cat = document.getElementById('filter-stock-category').value;
+        const health = document.getElementById('filter-stock-health').value;
+
+        const filtered = cachedBalances.filter(r => {
+            const matchesSearch = !search || r.item_name.toLowerCase().includes(search);
+            const matchesDept = dept === 'ALL' || r.dept_code === dept;
+            const matchesCat = cat === 'ALL' || r.category === cat;
+            const isLow = r.balance <= r.reorder_level;
+            const matchesHealth = health === 'ALL' || (health === 'LOW' ? isLow : !isLow);
+
+            return matchesSearch && matchesDept && matchesCat && matchesHealth;
+        });
+
+        if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center p-6 text-gray-400">No stock balances match your criteria.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = data.map(r => {
+        tbody.innerHTML = filtered.map(r => {
             const isLow = r.balance <= r.reorder_level;
             return `
                 <tr class="hover:bg-gray-50 border-b">
@@ -450,23 +545,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
-    document.getElementById('filter-stock-dept').addEventListener('change', loadStockBalances);
-
     // --------------------------------------------------------------------------
-    // 7. MOVEMENT LEDGER & TOP-UP TRACKER
+    // 7. MOVEMENT LEDGER (AUDITED) & FILTERS
     // --------------------------------------------------------------------------
     async function loadLedgerRecords() {
         const tbody = document.getElementById('ledger-table-body');
-        const typeFilter = document.getElementById('filter-ledger-type').value;
-
         let query = supabase.from('stock_movements')
             .select('*, items(name, unit), departments(name, dept_code)')
             .order('created_at', { ascending: false })
-            .limit(100);
-
-        if (typeFilter !== 'ALL') {
-            query = query.eq('movement_type', typeFilter);
-        }
+            .limit(150);
 
         if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             const dept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
@@ -479,12 +566,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        if (!data || !data.length) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400">No ledger entries match criteria.</td></tr>`;
+        cachedMovements = data || [];
+        renderLedgerTable();
+    }
+
+    function renderLedgerTable() {
+        const tbody = document.getElementById('ledger-table-body');
+        const search = document.getElementById('filter-ledger-search').value.toLowerCase();
+        const moveType = document.getElementById('filter-ledger-type').value;
+        const dept = document.getElementById('filter-ledger-dept').value;
+        const dateVal = document.getElementById('filter-ledger-date').value;
+
+        const filtered = cachedMovements.filter(m => {
+            const matchesSearch = !search || 
+                (m.items?.name && m.items.name.toLowerCase().includes(search)) ||
+                (m.performed_by_name && m.performed_by_name.toLowerCase().includes(search)) ||
+                (m.performed_by_email && m.performed_by_email.toLowerCase().includes(search)) ||
+                (m.reason && m.reason.toLowerCase().includes(search));
+
+            const matchesType = moveType === 'ALL' || m.movement_type === moveType;
+            const matchesDept = dept === 'ALL' || m.departments?.dept_code === dept;
+            const matchesDate = !dateVal || m.created_at.startsWith(dateVal);
+
+            return matchesSearch && matchesType && matchesDept && matchesDate;
+        });
+
+        if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center p-6 text-gray-400">No ledger records match filters.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = data.map(m => {
+        tbody.innerHTML = filtered.map(m => {
             const dateStr = new Date(m.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
             const isIn = m.direction === 'In';
             return `
@@ -508,16 +620,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ${m.reason || ''} 
                         ${m.people_count ? `(${m.people_count} people)` : ''}
                     </td>
-                    <td class="p-2.5 text-xs text-gray-500">${m.performed_by_name}</td>
+                    <td class="p-2.5 text-xs text-gray-700 font-medium">
+                        ${m.performed_by_name} <br>
+                        <span class="text-gray-400 font-mono text-[10px]">${m.performed_by_email || m.performed_by_dept}</span>
+                    </td>
                 </tr>
             `;
         }).join('');
     }
 
-    document.getElementById('filter-ledger-type').addEventListener('change', loadLedgerRecords);
-
     // --------------------------------------------------------------------------
-    // 8. DEDICATED DONATION REGISTER
+    // 8. DONATION REGISTER VIEW & FILTERS
     // --------------------------------------------------------------------------
     async function loadDonationRegister() {
         const tbody = document.getElementById('donations-table-body');
@@ -528,12 +641,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        if (!data || !data.length) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-400">No donations registered yet.</td></tr>`;
+        cachedDonations = data || [];
+        renderDonationsTable();
+    }
+
+    function renderDonationsTable() {
+        const tbody = document.getElementById('donations-table-body');
+        const search = document.getElementById('filter-donations-search').value.toLowerCase();
+        const intent = document.getElementById('filter-donations-intent').value;
+        const status = document.getElementById('filter-donations-status').value;
+
+        const filtered = cachedDonations.filter(d => {
+            const matchesSearch = !search || 
+                d.donation_ref.toLowerCase().includes(search) || 
+                d.donor_name.toLowerCase().includes(search) ||
+                d.item_name.toLowerCase().includes(search);
+
+            const matchesIntent = intent === 'ALL' || (intent === 'Unrestricted' ? d.donor_intent === 'Unrestricted' : d.donor_intent !== 'Unrestricted');
+            const hasRemaining = d.remaining_balance > 0;
+            const matchesStatus = status === 'ALL' || (status === 'AVAILABLE' ? hasRemaining : !hasRemaining);
+
+            return matchesSearch && matchesIntent && matchesStatus;
+        });
+
+        if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-gray-400">No donations match filters.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = data.map(d => `
+        tbody.innerHTML = filtered.map(d => `
             <tr class="hover:bg-gray-50 border-b">
                 <td class="p-2.5 font-mono font-bold text-orange-950">${d.donation_ref}</td>
                 <td class="p-2.5 font-medium">${d.donor_name}</td>
@@ -548,7 +684,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 9. REPLENISHMENT & MARKET LIST VIEW
+    // 9. REPLENISHMENT LIST VIEW
     // --------------------------------------------------------------------------
     async function loadReplenishmentList() {
         const tbody = document.getElementById('replenishment-table-body');
@@ -561,7 +697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (!data || !data.length) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-emerald-700 font-semibold">🎉 All items are adequately stocked! No replenishment needed right now.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-emerald-700 font-semibold">🎉 All items are adequately stocked! No replenishment needed.</td></tr>`;
             budgetElem.textContent = 'Estimated Budget: KES 0.00';
             return;
         }
@@ -585,16 +721,123 @@ document.addEventListener('DOMContentLoaded', async () => {
         budgetElem.textContent = `Estimated Budget: KES ${totalEst.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
     }
 
+    // --------------------------------------------------------------------------
+    // 10. STAFF & ACCOUNTS MANAGEMENT (ADMIN PORTAL)
+    // --------------------------------------------------------------------------
+    async function loadStaffAccounts() {
+        if (currentUserDeptCode !== 'AD001') return;
+
+        const tbody = document.getElementById('staff-table-body');
+        const { data, error } = await supabase.from('staff_profiles').select('*').order('dept_code');
+
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+            return;
+        }
+
+        cachedStaff = data || [];
+        tbody.innerHTML = cachedStaff.map(s => `
+            <tr class="hover:bg-gray-50 border-b">
+                <td class="p-2.5 font-mono font-bold text-emerald-950">${s.dept_code}</td>
+                <td class="p-2.5 font-semibold text-gray-800">${s.staff_name}</td>
+                <td class="p-2.5 text-gray-600 font-mono">${s.email}</td>
+                <td class="p-2.5"><span class="px-2 py-0.5 rounded text-xs bg-gray-100 font-medium">${s.role}</span></td>
+                <td class="p-2.5">
+                    <span class="px-2 py-0.5 rounded text-xs font-semibold ${s.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${s.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td class="p-2.5 text-right space-x-1">
+                    <button onclick="window.editStaffMember('${s.id}')" class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded text-gray-700">Edit</button>
+                    <button onclick="window.toggleStaffStatus('${s.id}', ${s.is_active})" class="text-xs ${s.is_active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'} px-2 py-1 rounded">
+                        ${s.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    window.editStaffMember = (staffId) => {
+        const staff = cachedStaff.find(s => s.id === staffId);
+        if (!staff) return;
+
+        document.getElementById('edit_staff_id').value = staff.id;
+        document.getElementById('edit_staff_name').value = staff.staff_name;
+        document.getElementById('edit_staff_dept').value = staff.dept_code;
+        document.getElementById('edit_staff_role').value = staff.role;
+        document.getElementById('edit_staff_active').checked = staff.is_active;
+
+        document.getElementById('modal-edit-staff').classList.remove('hidden');
+    };
+
+    window.toggleStaffStatus = async (staffId, currentStatus) => {
+        if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this staff member?`)) return;
+
+        const { error } = await supabase.from('staff_profiles').update({ is_active: !currentStatus }).eq('id', staffId);
+        if (error) {
+            alert('Error updating status: ' + error.message);
+        } else {
+            loadStaffAccounts();
+        }
+    };
+
+    document.getElementById('form-edit-staff').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const staffId = document.getElementById('edit_staff_id').value;
+        const payload = {
+            staff_name: document.getElementById('edit_staff_name').value.trim(),
+            dept_code: document.getElementById('edit_staff_dept').value,
+            role: document.getElementById('edit_staff_role').value,
+            is_active: document.getElementById('edit_staff_active').checked,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase.from('staff_profiles').update(payload).eq('id', staffId);
+        if (error) {
+            alert('Error updating staff: ' + error.message);
+        } else {
+            alert('Staff details successfully updated!');
+            document.getElementById('modal-edit-staff').classList.add('hidden');
+            loadStaffAccounts();
+        }
+    });
+
+    // --------------------------------------------------------------------------
+    // 11. FILTER EVENT LISTENERS
+    // --------------------------------------------------------------------------
+    function setupFilters() {
+        ['filter-stock-search', 'filter-stock-dept', 'filter-stock-category', 'filter-stock-health'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', renderStockBalancesTable);
+        });
+
+        ['filter-ledger-search', 'filter-ledger-type', 'filter-ledger-dept', 'filter-ledger-date'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', renderLedgerTable);
+        });
+
+        ['filter-donations-search', 'filter-donations-intent', 'filter-donations-status'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', renderDonationsTable);
+        });
+
+        ['filter-assets-search', 'filter-assets-dept', 'filter-assets-condition', 'filter-assets-acq'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', renderAssetsTable);
+        });
+    }
+
     function refreshAllViews() {
         loadStockBalances();
         loadLedgerRecords();
         loadDonationRegister();
         loadAssets();
         loadReplenishmentList();
+        if (currentUserDeptCode === 'AD001') loadStaffAccounts();
     }
 
     // --------------------------------------------------------------------------
-    // 10. EXPORT DATA TO CSV UTILITIES
+    // 12. EXPORT TO CSV (WITH COMPLETE AUDIT DETAILS)
     // --------------------------------------------------------------------------
     function downloadCSV(csvContent, fileName) {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -622,11 +865,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data } = await supabase.from('stock_movements').select('*, items(name, unit), departments(name)');
         if (!data || !data.length) return alert('No movements to export.');
 
-        let csv = 'Date,Movement Type,Direction,Item,Unit,Quantity,Department,Reason,Operator\n';
+        let csv = 'Timestamp,Movement Type,Direction,Item,Quantity,Unit,Department,Reason Category,Comments,Operator Name,Operator Account\n';
         data.forEach(m => {
-            csv += `"${m.created_at}","${m.movement_type}","${m.direction}","${m.items?.name}","${m.items?.unit}",${m.quantity},"${m.departments?.name}","${m.reason || ''}","${m.performed_by_name}"\n`;
+            csv += `"${m.created_at}","${m.movement_type}","${m.direction}","${m.items?.name}",${m.quantity},"${m.items?.unit}","${m.departments?.name}","${m.reason_category || ''}","${m.reason || ''}","${m.performed_by_name}","${m.performed_by_email}"\n`;
         });
-        downloadCSV(csv, `Amys_House_Movement_Ledger_${new Date().toISOString().slice(0,10)}.csv`);
+        downloadCSV(csv, `Amys_House_Audit_Ledger_${new Date().toISOString().slice(0,10)}.csv`);
     });
 
     document.getElementById('btn-export-donations').addEventListener('click', async () => {
@@ -644,15 +887,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data } = await supabase.from('assets').select('*, departments(name)');
         if (!data || !data.length) return alert('No assets to export.');
 
-        let csv = 'Asset Name,Department,Acquisition,Condition,Cost Value,Location,Custodian,Tag Serial\n';
+        let csv = 'Asset Name,Department,Acquisition,Condition,Cost Value,Location,Custodian,Tag Serial,Logged By Name,Logged By Email\n';
         data.forEach(a => {
-            csv += `"${a.item_name}","${a.departments?.name}","${a.acquisition_type}","${a.condition}",${a.cost_or_value},"${a.storage_location}","${a.custodian}","${a.tag_or_serial || ''}"\n`;
+            csv += `"${a.item_name}","${a.departments?.name}","${a.acquisition_type}","${a.condition}",${a.cost_or_value},"${a.storage_location}","${a.custodian}","${a.tag_or_serial || ''}","${a.performed_by_name}","${a.performed_by_email}"\n`;
         });
         downloadCSV(csv, `Amys_House_Assets_${new Date().toISOString().slice(0,10)}.csv`);
     });
 
     // --------------------------------------------------------------------------
-    // 11. ONLINE / OFFLINE STATUS INDICATOR
+    // 13. NETWORK STATUS MONITOR
     // --------------------------------------------------------------------------
     const syncStatus = document.getElementById('sync-status');
     window.addEventListener('online', () => {

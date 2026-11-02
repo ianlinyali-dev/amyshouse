@@ -1,6 +1,8 @@
-// MAKE SURE YOU REPLACE THESE WITH YOUR ACTUAL SUPABASE KEYS
+// USING YOUR EXACT PROVIDED CREDENTIALS
 const SUPABASE_URL = 'https://vjdqfgjbibocgorruhfj.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_IX8R_VHKZ5pBLokFhl1lxA_JC2ya20s';
+
+// Initialize Client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUserProfile = null;
@@ -14,7 +16,7 @@ const movementTypeSelect = document.getElementById('movement_type');
 const donationFields = document.getElementById('donation-fields');
 const loginBtn = document.getElementById('login-submit-btn');
 
-// Network Status
+// Network Status Listeners
 window.addEventListener('online', updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 function updateOnlineStatus() {
@@ -29,18 +31,21 @@ function updateOnlineStatus() {
     }
 }
 
-// Auth State Listener
+// Global Auth State Listener
 supabase.auth.onAuthStateChange(async (event, session) => {
     if (session) {
         try {
-            // Fetch User Profile to get Name and Role
+            // Fetch User Profile
             const { data, error } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
             
-            if (error) throw error;
-            if (!data) throw new Error("Profile not found in database. Check SQL Setup.");
+            if (error) {
+                console.error("Profile Fetch Error:", error);
+                throw new Error("Could not find user profile. Did you run the SQL fix query?");
+            }
 
             currentUserProfile = data;
             
+            // Show Dashboard
             authSection.classList.add('hidden');
             dashSection.classList.remove('hidden');
             logoutBtn.classList.remove('hidden');
@@ -55,12 +60,12 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 
             initializeApp();
         } catch (err) {
-            console.error(err);
-            alert(`Setup Error: ${err.message}`);
-            // Log out if profile fails to load to prevent freeze
+            alert(`System Alert: ${err.message}`);
+            // Force logout so they don't get stuck in a broken state
             supabase.auth.signOut();
         }
     } else {
+        // Show Login Screen
         authSection.classList.remove('hidden');
         dashSection.classList.add('hidden');
         logoutBtn.classList.add('hidden');
@@ -69,24 +74,27 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     }
 });
 
-// Login Submission
+// Explicit Login Submission Handling
 document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Extra safety to stop page reload
+    
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
     
-    loginBtn.textContent = 'Logging in...';
+    loginBtn.textContent = 'Checking Credentials...';
     loginBtn.disabled = true;
 
     try {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
+        
         if (error) {
-            alert("Login failed: " + error.message);
+            alert("Login Failed: " + error.message);
             loginBtn.textContent = 'Sign In';
             loginBtn.disabled = false;
         }
+        // If successful, onAuthStateChange takes over automatically
     } catch (err) {
-        alert("System error: Make sure you added your Supabase URL & Key in app.js.");
+        alert("Critical Error connecting to Supabase: " + err.message);
         loginBtn.textContent = 'Sign In';
         loginBtn.disabled = false;
     }
@@ -98,7 +106,7 @@ logoutBtn.addEventListener('click', async () => {
     loginBtn.disabled = false;
 });
 
-// Init Data
+// App Initialization Functions
 async function initializeApp() {
     await loadDropdowns();
     await loadStockBalances();
@@ -126,7 +134,7 @@ async function loadDropdowns() {
         document.getElementById('donor_id').innerHTML = '<option value="">Select...</option>' + 
             (donors || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
     } catch (e) { 
-        console.error("Offline mode active or data fetch failed.", e); 
+        console.warn("Dropdown load failed - check network or DB rules", e); 
     }
 }
 
@@ -134,7 +142,7 @@ async function loadStockBalances() {
     const tbody = document.getElementById('balances-table-body');
     const { data, error } = await supabase.from('current_stock_balances').select('*');
     
-    if (error) return tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 p-4">Error loading data</td></tr>`;
+    if (error) return tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 p-4">Error loading balance data: ${error.message}</td></tr>`;
     if (!data || !data.length) return tbody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 p-4">No records found.</td></tr>`;
 
     const { data: itemsData } = await supabase.from('items').select('name, reorder_level');
@@ -153,7 +161,7 @@ async function loadStockBalances() {
     }).join('');
 }
 
-// Record Movement with Staff Name Attached
+// Record Movement Handling
 document.getElementById('movement-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const isDonation = document.getElementById('movement_type').value === 'Donation';
@@ -175,15 +183,16 @@ document.getElementById('movement-form').addEventListener('submit', async (e) =>
         let queue = JSON.parse(localStorage.getItem('offline_queue') || '[]');
         queue.push(payload);
         localStorage.setItem('offline_queue', JSON.stringify(queue));
-        alert('Offline: Saved locally.');
+        alert('Offline mode: Saved locally.');
         e.target.reset();
         return;
     }
 
     const { error } = await supabase.from('stock_movements').insert([payload]);
-    if (error) alert("Error saving: " + error.message);
-    else {
-        alert('Saved!');
+    if (error) {
+        alert("Error saving movement: " + error.message);
+    } else {
+        alert('Movement Saved successfully!');
         e.target.reset();
         donationFields.classList.add('hidden');
         loadStockBalances();
@@ -201,13 +210,12 @@ function syncOfflineQueue() {
     });
 }
 
-// ADMIN FUNCTIONALITY
+// Admin Panel Logic
 async function loadAdminUsersTable() {
-    const { data } = await supabase.from('user_profiles').select('*');
+    const { data, error } = await supabase.from('user_profiles').select('*');
+    if (error) return console.error("Admin fetch error:", error);
+    
     const tbody = document.getElementById('admin-users-table');
-    
-    if (!data) return;
-    
     tbody.innerHTML = data.map(user => `
         <tr>
             <td class="p-2 text-xs">${user.generic_email || 'Unknown'}</td>
@@ -216,7 +224,7 @@ async function loadAdminUsersTable() {
                 <input type="text" id="staff-name-${user.id}" value="${user.current_staff_name}" class="border rounded p-1 w-full">
             </td>
             <td class="p-2 text-xs">
-                <button onclick="updateStaffName('${user.id}')" class="bg-[#0b3b2c] text-white px-2 py-1 rounded">Update</button>
+                <button onclick="updateStaffName('${user.id}')" class="bg-[#0b3b2c] hover:bg-emerald-900 text-white px-2 py-1 rounded transition">Update</button>
             </td>
         </tr>
     `).join('');

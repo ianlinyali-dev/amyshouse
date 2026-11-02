@@ -1,5 +1,5 @@
-// BUMPED VERSION TO CLEAR OLD PWA CACHE
-const CACHE_NAME = 'amys-house-v3'; 
+// BUMPED TO V4 TO FORCE BROWSER TO DOWNLOAD NEW HTML
+const CACHE_NAME = 'amys-house-v4'; 
 const ASSETS = [
   '/',
   '/index.html',
@@ -11,13 +11,13 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  self.skipWaiting(); // Force new service worker to activate immediately
+  self.skipWaiting();
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then(k => Promise.all(k.map(key => key !== CACHE_NAME ? caches.delete(key) : null))));
-  self.clients.claim(); // Take control of all pages immediately
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {

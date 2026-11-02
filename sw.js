@@ -1,11 +1,10 @@
-// BUMPED TO V5 to force GitHub Pages to serve the new app.js
-const CACHE_NAME = 'amys-house-v5'; 
+const CACHE_NAME = 'amys-house-v6'; 
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/logo.png',
-  '/app.js',
+  './',
+  './index.html',
+  './manifest.json',
+  './logo.png',
+  './app.js',
   'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
@@ -22,6 +21,6 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request).then(res => res || caches.match('/index.html')))
+    fetch(e.request).catch(() => caches.match(e.request).then(res => res || caches.match('./index.html')))
   );
 });

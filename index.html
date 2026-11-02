@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MSCP Amy's House Inventory</title>
-    <!-- Favicon and PWA icons -->
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
     <link rel="manifest" href="manifest.json">
@@ -35,10 +34,12 @@
     <main id="auth-section" class="flex-grow flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100 w-full max-w-md">
             <h2 class="text-2xl font-bold text-[#0b3b2c] mb-6 text-center">Staff Login</h2>
-            <form id="login-form" class="space-y-4">
+            
+            <!-- ADDED onsubmit guard to prevent silent page reloads -->
+            <form id="login-form" class="space-y-4" onsubmit="event.preventDefault();">
                 <div>
                     <label class="block text-xs font-semibold text-gray-600">Department / Role Email</label>
-                    <input type="email" id="auth-email" required placeholder="e.g. store@amyshouse.org" class="w-full p-2 border rounded mt-1">
+                    <input type="email" id="auth-email" required placeholder="e.g. admin@amyshouse.org" class="w-full p-2 border rounded mt-1">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-600">Password</label>
@@ -73,7 +74,7 @@
         <!-- Left: Record Movement Form -->
         <section class="bg-white p-5 rounded-xl shadow-sm border border-emerald-900/10 lg:col-span-1 h-fit">
             <h2 class="text-md font-bold text-[#0b3b2c] mb-4 border-b pb-2">Record Movement</h2>
-            <form id="movement-form" class="space-y-4">
+            <form id="movement-form" class="space-y-4" onsubmit="event.preventDefault();">
                 <div>
                     <label class="block text-xs font-semibold text-gray-600 mb-1">Type</label>
                     <select id="movement_type" required class="w-full p-2 border rounded text-sm bg-gray-50">

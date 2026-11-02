@@ -1,3 +1,4 @@
+// MAKE SURE YOU REPLACE THESE WITH YOUR ACTUAL SUPABASE KEYS
 const SUPABASE_URL = 'https://vjdqfgjbibocgorruhfj.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_IX8R_VHKZ5pBLokFhl1lxA_JC2ya20s';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -11,6 +12,7 @@ const adminPanel = document.getElementById('admin-panel');
 const logoutBtn = document.getElementById('logout-btn');
 const movementTypeSelect = document.getElementById('movement_type');
 const donationFields = document.getElementById('donation-fields');
+const loginBtn = document.getElementById('login-submit-btn');
 
 // Network Status
 window.addEventListener('online', updateOnlineStatus);
@@ -30,23 +32,34 @@ function updateOnlineStatus() {
 // Auth State Listener
 supabase.auth.onAuthStateChange(async (event, session) => {
     if (session) {
-        authSection.classList.add('hidden');
-        dashSection.classList.remove('hidden');
-        logoutBtn.classList.remove('hidden');
-        
-        // Fetch User Profile to get Name and Role
-        const { data } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
-        currentUserProfile = data;
-        
-        document.getElementById('user-display-role').textContent = `Logged in: ${data.current_staff_name} (${data.role})`;
+        try {
+            // Fetch User Profile to get Name and Role
+            const { data, error } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
+            
+            if (error) throw error;
+            if (!data) throw new Error("Profile not found in database. Check SQL Setup.");
 
-        // Show Admin Panel if Admin
-        if (data.role === 'admin') {
-            adminPanel.classList.remove('hidden');
-            loadAdminUsersTable();
+            currentUserProfile = data;
+            
+            authSection.classList.add('hidden');
+            dashSection.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
+            
+            document.getElementById('user-display-role').textContent = `Logged in: ${data.current_staff_name} (${data.role})`;
+
+            // Show Admin Panel if Admin
+            if (data.role === 'admin') {
+                adminPanel.classList.remove('hidden');
+                loadAdminUsersTable();
+            }
+
+            initializeApp();
+        } catch (err) {
+            console.error(err);
+            alert(`Setup Error: ${err.message}`);
+            // Log out if profile fails to load to prevent freeze
+            supabase.auth.signOut();
         }
-
-        initializeApp();
     } else {
         authSection.classList.remove('hidden');
         dashSection.classList.add('hidden');
@@ -56,17 +69,34 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     }
 });
 
-// Login (Removed auto-register, requires Admin to have created the generic accounts)
+// Login Submission
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
     
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert("Login failed. Contact Admin if you need an account reset.");
+    loginBtn.textContent = 'Logging in...';
+    loginBtn.disabled = true;
+
+    try {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+            alert("Login failed: " + error.message);
+            loginBtn.textContent = 'Sign In';
+            loginBtn.disabled = false;
+        }
+    } catch (err) {
+        alert("System error: Make sure you added your Supabase URL & Key in app.js.");
+        loginBtn.textContent = 'Sign In';
+        loginBtn.disabled = false;
+    }
 });
 
-logoutBtn.addEventListener('click', async () => await supabase.auth.signOut());
+logoutBtn.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    loginBtn.textContent = 'Sign In';
+    loginBtn.disabled = false;
+});
 
 // Init Data
 async function initializeApp() {
@@ -90,12 +120,14 @@ async function loadDropdowns() {
         ]);
         
         document.getElementById('item_id').innerHTML = '<option value="">Select...</option>' + 
-            items.map(i => `<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
+            (items || []).map(i => `<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
         document.getElementById('department_id').innerHTML = '<option value="">Select...</option>' + 
-            depts.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+            (depts || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
         document.getElementById('donor_id').innerHTML = '<option value="">Select...</option>' + 
-            donors.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-    } catch (e) { console.error("Offline mode active."); }
+            (donors || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    } catch (e) { 
+        console.error("Offline mode active or data fetch failed.", e); 
+    }
 }
 
 async function loadStockBalances() {
@@ -103,7 +135,7 @@ async function loadStockBalances() {
     const { data, error } = await supabase.from('current_stock_balances').select('*');
     
     if (error) return tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 p-4">Error loading data</td></tr>`;
-    if (!data.length) return tbody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 p-4">No records found.</td></tr>`;
+    if (!data || !data.length) return tbody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 p-4">No records found.</td></tr>`;
 
     const { data: itemsData } = await supabase.from('items').select('name, reorder_level');
 
@@ -133,7 +165,7 @@ document.getElementById('movement-form').addEventListener('submit', async (e) =>
         direction: document.getElementById('direction').value,
         quantity: parseFloat(document.getElementById('quantity').value),
         reason: document.getElementById('reason').value,
-        performed_by_name: `${currentUserProfile.current_staff_name} (${currentUserProfile.role})`, // Perfect Audit Trail
+        performed_by_name: currentUserProfile ? `${currentUserProfile.current_staff_name} (${currentUserProfile.role})` : 'Offline User',
         donor_id: isDonation ? document.getElementById('donor_id').value || null : null,
         donation_ref: isDonation ? document.getElementById('donation_ref').value : null,
         item_condition: isDonation ? document.getElementById('item_condition').value : null
@@ -149,7 +181,7 @@ document.getElementById('movement-form').addEventListener('submit', async (e) =>
     }
 
     const { error } = await supabase.from('stock_movements').insert([payload]);
-    if (error) alert(error.message);
+    if (error) alert("Error saving: " + error.message);
     else {
         alert('Saved!');
         e.target.reset();
@@ -173,6 +205,9 @@ function syncOfflineQueue() {
 async function loadAdminUsersTable() {
     const { data } = await supabase.from('user_profiles').select('*');
     const tbody = document.getElementById('admin-users-table');
+    
+    if (!data) return;
+    
     tbody.innerHTML = data.map(user => `
         <tr>
             <td class="p-2 text-xs">${user.generic_email || 'Unknown'}</td>

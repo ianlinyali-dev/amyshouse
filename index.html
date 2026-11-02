@@ -14,7 +14,7 @@
 </head>
 <body class="bg-[#fcfbf9] text-gray-800 antialiased min-h-screen flex flex-col font-sans">
 
-    <!-- Header Navigation -->
+    <!-- Top Header -->
     <header class="bg-[#0b3b2c] text-white shadow-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap justify-between items-center gap-2">
             <div class="flex items-center space-x-3">
@@ -52,6 +52,9 @@
                 <button data-tab="tab-donations" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
                     🎁 Donation Register
                 </button>
+                <button data-tab="tab-donors" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
+                    🤝 Donors Directory
+                </button>
                 <button data-tab="tab-assets" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5">
                     💻 Asset Register
                 </button>
@@ -65,7 +68,7 @@
         </nav>
     </header>
 
-    <!-- Authentication Section -->
+    <!-- Sign-in Screen -->
     <main id="auth-section" class="flex-grow flex items-center justify-center p-4">
         <div class="bg-white p-7 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md">
             <div class="text-center mb-6">
@@ -110,7 +113,18 @@
     </main>
 
     <!-- Main Workspace -->
-    <main id="dashboard-section" style="display: none;" class="flex-grow max-w-7xl w-full mx-auto p-4 space-y-6">
+    <main id="dashboard-section" style="display: none;" class="flex-grow max-w-7xl w-full mx-auto p-4 space-y-4">
+
+        <!-- ACTION CENTRE: Real-Time Alerts for Expired, Expiring & Low Stock Items -->
+        <section id="action-centre-panel" style="display: none;" class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+            <div class="bg-red-50 border-b border-red-200 px-4 py-2.5 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="animate-pulse text-red-600 font-bold text-sm">⚠️ ACTION CENTRE: Immediate Stock Attention Required</span>
+                </div>
+                <span id="action-centre-count" class="text-xs bg-red-600 text-white font-bold px-2 py-0.5 rounded-full">0 Alerts</span>
+            </div>
+            <div id="action-centre-items" class="p-3 divide-y divide-gray-100 text-xs"></div>
+        </section>
 
         <!-- TAB 1: Stock Balances -->
         <section id="tab-stock" class="tab-content space-y-4">
@@ -118,11 +132,16 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Live Stock Balances</h2>
-                        <p class="text-xs text-gray-500">Live inventory across Central Store and department reserves</p>
+                        <p class="text-xs text-gray-500">Inventory across Central Store & departments</p>
                     </div>
-                    <button id="btn-export-stock" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto flex items-center gap-1">
-                        📥 Export CSV
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-open-catalog-edit" class="bg-emerald-50 hover:bg-emerald-100 text-[#0b3b2c] border border-emerald-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                            ✏️ Edit Items & Prices
+                        </button>
+                        <button id="btn-export-stock" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+                            📥 Export CSV
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Filters -->
@@ -155,6 +174,7 @@
                                 <th class="p-3">Category</th>
                                 <th class="p-3">Stock Owner</th>
                                 <th class="p-3">Balance</th>
+                                <th class="p-3">Current Unit Cost</th>
                                 <th class="p-3">Status</th>
                                 <th class="p-3 text-right">Perishable?</th>
                             </tr>
@@ -171,14 +191,12 @@
                 <div class="border-b pb-3 flex justify-between items-center">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Record Stock Movement</h2>
-                        <p class="text-xs text-gray-500">Every movement is recorded once; balances update automatically.</p>
+                        <p class="text-xs text-gray-500">Each movement is entered once; balances update automatically.</p>
                     </div>
                     <button type="button" id="btn-open-new-item-modal" class="text-xs bg-[#e85d04] hover:bg-[#d05203] text-white px-2.5 py-1.5 rounded-lg font-medium transition">
                         + New Item
                     </button>
                 </div>
-
-                <div id="movement-alert-box" style="display: none;" class="p-3 rounded-lg text-xs"></div>
 
                 <form id="movement-form" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -189,7 +207,7 @@
                                 <option value="Purchase">Purchase (In)</option>
                                 <option value="Donation (Amy's House)">Donation for Amy's House (In)</option>
                                 <option value="Donation (Department)">Donation for a Department (In)</option>
-                                <option value="Farm Produce">Farm Produce (In)</option>
+                                <option value="Farm Produce">Farm Produce / Harvest (In)</option>
                                 <option value="Weekly Supply">Weekly Supply (Out - Regular Friday)</option>
                                 <option value="Top-up">Top-up (Out - Extra supply)</option>
                                 <option value="Issue to Department">Issue to Department (Out)</option>
@@ -206,22 +224,25 @@
                         </div>
                     </div>
 
-                    <!-- Dynamic Donation Details Panel -->
+                    <!-- Dynamic Donation Details Panel with Auto-Reference Generation -->
                     <div id="donation-fields" style="display: none;" class="p-4 bg-orange-50/70 border border-orange-200 rounded-xl space-y-3">
                         <div class="flex justify-between items-center">
                             <span class="text-xs font-bold text-orange-900 uppercase tracking-wide">Donation Details</span>
-                            <button type="button" id="btn-open-new-donor-modal" class="text-xs text-[#e85d04] underline hover:font-bold">+ Add Donor</button>
+                            <button type="button" id="btn-open-new-donor-modal" class="text-xs text-[#e85d04] underline hover:font-bold">+ Add New Donor</button>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">Donor</label>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Donor Name</label>
                                 <select id="donor_id" class="w-full p-2 border rounded-lg text-sm bg-white outline-none">
                                     <option value="">Select Donor...</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">Ref No.</label>
-                                <input type="text" id="donation_ref" placeholder="e.g. AH/DR/001" class="w-full p-2 border rounded-lg text-sm outline-none">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-xs font-semibold text-gray-700">Donation Ref No.</label>
+                                    <span id="auto-ref-tag" class="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.2 rounded font-mono font-bold">Auto</span>
+                                </div>
+                                <input type="text" id="donation_ref" placeholder="Auto-generated (e.g. AH/DR/001)" class="w-full p-2 border rounded-lg text-sm font-mono font-bold text-[#0b3b2c] bg-white outline-none">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">Condition</label>
@@ -251,15 +272,18 @@
                         </div>
                     </div>
 
-                    <!-- Quantity & Cost -->
+                    <!-- Quantity, Unit Price & Expiry -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Quantity</label>
                             <input type="number" id="quantity" step="0.01" min="0.01" required placeholder="0.00" class="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0b3b2c]">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Unit Cost / Value (KES)</label>
-                            <input type="number" id="unit_price" step="0.01" min="0" placeholder="Optional" class="w-full p-2.5 border rounded-lg text-sm outline-none">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="block text-xs font-semibold text-gray-700">Unit Price (KES)</label>
+                                <span id="item-current-price-hint" class="text-[10px] text-gray-400"></span>
+                            </div>
+                            <input type="number" id="unit_price" step="0.01" min="0" placeholder="e.g. 160" class="w-full p-2.5 border rounded-lg text-sm outline-none">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Expiry Date (Perishables)</label>
@@ -286,7 +310,7 @@
                             <input type="number" id="people_count" min="1" placeholder="e.g. 45" class="w-full p-2.5 border rounded-lg text-sm outline-none">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Specific Comments</label>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Specific Notes</label>
                             <input type="text" id="reason" placeholder="Specific notes..." class="w-full p-2.5 border rounded-lg text-sm outline-none">
                         </div>
                     </div>
@@ -304,14 +328,13 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Movement Audit Ledger</h2>
-                        <p class="text-xs text-gray-500">Every entry is permanent, tracking the exact operator and account responsible</p>
+                        <p class="text-xs text-gray-500">Every entry is permanently tracked, with operator and account identity</p>
                     </div>
                     <button id="btn-export-ledger" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto">
                         📥 Export Ledger
                     </button>
                 </div>
 
-                <!-- Filters -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t text-xs">
                     <input type="text" id="filter-ledger-search" placeholder="🔍 Search item, operator, reason..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
                     <select id="filter-ledger-type" class="p-2 border rounded-lg outline-none bg-gray-50">
@@ -356,14 +379,13 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Donation Register</h2>
-                        <p class="text-xs text-gray-500">Every gift received, donor intent, consumption, and remaining balance</p>
+                        <p class="text-xs text-gray-500">Every gift received, donor intent, consumption, and balance remaining</p>
                     </div>
                     <button id="btn-export-donations" class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto">
                         📥 Export Register
                     </button>
                 </div>
 
-                <!-- Filters -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t text-xs">
                     <input type="text" id="filter-donations-search" placeholder="🔍 Search Ref No, Donor, Item..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
                     <select id="filter-donations-intent" class="p-2 border rounded-lg outline-none bg-gray-50">
@@ -400,7 +422,36 @@
             </div>
         </section>
 
-        <!-- TAB 5: Asset Register -->
+        <!-- TAB 5: Donors Directory -->
+        <section id="tab-donors" class="tab-content space-y-4 hidden">
+            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-bold text-[#0b3b2c]">Donors Directory</h2>
+                    <p class="text-xs text-gray-500">Manage partner donors, contact details, and their giving records</p>
+                </div>
+                <button id="btn-open-add-donor" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto">
+                    + Add New Donor
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-amber-50 text-amber-950 uppercase border-b border-amber-200">
+                            <tr>
+                                <th class="p-2.5">Donor Name</th>
+                                <th class="p-2.5">Contact Information</th>
+                                <th class="p-2.5">Registered Date</th>
+                                <th class="p-2.5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="donors-table-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 6: Asset Register -->
         <section id="tab-assets" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -418,7 +469,6 @@
                     </div>
                 </div>
 
-                <!-- Filters -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t text-xs">
                     <input type="text" id="filter-assets-search" placeholder="🔍 Search asset, custodian, tag..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
                     <select id="filter-assets-dept" class="p-2 border rounded-lg outline-none bg-gray-50">
@@ -460,12 +510,12 @@
             </div>
         </section>
 
-        <!-- TAB 6: Replenishment List -->
+        <!-- TAB 7: Replenishment List -->
         <section id="tab-replenishment" class="tab-content space-y-4 hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                 <div>
                     <h2 class="text-lg font-bold text-[#0b3b2c]">Replenishment & Market List</h2>
-                    <p class="text-xs text-gray-500">Automatically calculated items below reorder thresholds</p>
+                    <p class="text-xs text-gray-500">Automatically calculated from current stock and latest purchase rates</p>
                 </div>
                 <div id="total-market-budget" class="text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg">
                     Estimated Budget: KES 0.00
@@ -481,8 +531,9 @@
                                 <th class="p-2.5">Category</th>
                                 <th class="p-2.5">Current Stock</th>
                                 <th class="p-2.5">Reorder Threshold</th>
-                                <th class="p-2.5 font-bold text-red-700">Recommended Buy</th>
-                                <th class="p-2.5">Unit Cost (Est.)</th>
+                                <th class="p-2.5 font-bold text-red-700">Recommended Order</th>
+                                <th class="p-2.5">Source / Channel</th>
+                                <th class="p-2.5">Latest Unit Price</th>
                                 <th class="p-2.5 text-right font-bold">Total Budget</th>
                             </tr>
                         </thead>
@@ -492,11 +543,11 @@
             </div>
         </section>
 
-        <!-- TAB 7: Staff & Account Management (Admin Only) -->
+        <!-- TAB 8: Staff & Account Management (Admin Only) -->
         <section id="tab-accounts" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-bold text-[#0b3b2c]">System Staff & Department Accounts</h2>
+                    <h2 class="text-lg font-bold text-[#0b3b2c]">Staff & Department Accounts</h2>
                     <p class="text-xs text-gray-500">Manage assigned operators, roles, and department login credentials</p>
                 </div>
                 <button id="btn-open-new-staff-modal" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition self-start md:self-auto">
@@ -525,7 +576,58 @@
 
     </main>
 
-    <!-- MODAL: Edit My Profile / Admin Handover -->
+    <!-- MODAL: Catalog & Price Editor -->
+    <div id="modal-catalog-editor" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b pb-2">
+                <div>
+                    <h3 class="text-base font-bold text-[#0b3b2c]">Item Catalog & Pricing Editor</h3>
+                    <p class="text-xs text-gray-500">Update standard prices, reorder levels, and perishability</p>
+                </div>
+                <button type="button" onclick="document.getElementById('modal-catalog-editor').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+            </div>
+            <div class="overflow-y-auto flex-grow">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-2">Item</th>
+                            <th class="p-2">Unit</th>
+                            <th class="p-2">Price (KES)</th>
+                            <th class="p-2">Reorder Lvl</th>
+                            <th class="p-2">Perishable?</th>
+                            <th class="p-2 text-right">Save</th>
+                        </tr>
+                    </thead>
+                    <tbody id="catalog-editor-table-body" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Add / Edit Donor -->
+    <div id="modal-donor-editor" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 id="modal-donor-title" class="text-base font-bold text-[#0b3b2c] mb-1">Register New Donor</h3>
+            <p class="text-xs text-gray-500 mb-4">Add or edit partner, individual or organisation name</p>
+            <form id="form-donor-editor" class="space-y-3 text-xs">
+                <input type="hidden" id="edit_donor_id">
+                <div>
+                    <label class="block font-semibold mb-1">Donor Full Name</label>
+                    <input type="text" id="donor_full_name" required placeholder="e.g. St. Andrew's Turi" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Contact Details / Notes</label>
+                    <input type="text" id="donor_contact_info" placeholder="Phone, email, or address" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t">
+                    <button type="button" onclick="document.getElementById('modal-donor-editor').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-[#e85d04] text-white rounded-lg font-semibold hover:bg-[#d05203]">Save Donor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Edit My Profile -->
     <div id="modal-my-profile" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Update Operator Name</h3>
@@ -542,43 +644,6 @@
                 <div class="flex justify-end space-x-2 pt-3 border-t">
                     <button type="button" onclick="document.getElementById('modal-my-profile').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Save Name</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: Edit Staff Account (Admin Only) -->
-    <div id="modal-edit-staff" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Edit Staff Account</h3>
-            <p class="text-xs text-gray-500 mb-4">Update assigned staff details or department access</p>
-            <form id="form-edit-staff" class="space-y-3 text-xs">
-                <input type="hidden" id="edit_staff_id">
-                <div>
-                    <label class="block font-semibold mb-1">Assigned Staff Name</label>
-                    <input type="text" id="edit_staff_name" required class="w-full p-2 border rounded-lg text-sm outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block font-semibold mb-1">Department</label>
-                        <select id="edit_staff_dept" class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none"></select>
-                    </div>
-                    <div>
-                        <label class="block font-semibold mb-1">System Role</label>
-                        <select id="edit_staff_role" class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none">
-                            <option value="Executive Admin">Executive Admin</option>
-                            <option value="Storekeeper">Storekeeper</option>
-                            <option value="Department Officer">Department Officer</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="flex items-center space-x-2 pt-2">
-                    <input type="checkbox" id="edit_staff_active" class="rounded text-[#0b3b2c]">
-                    <label for="edit_staff_active" class="font-medium">Account is Active</label>
-                </div>
-                <div class="flex justify-end space-x-2 pt-3 border-t">
-                    <button type="button" onclick="document.getElementById('modal-edit-staff').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Update Staff</button>
                 </div>
             </form>
         </div>
@@ -615,7 +680,7 @@
                         <input type="number" id="new_item_reorder" step="1" value="10" class="w-full p-2 border rounded-lg text-sm outline-none">
                     </div>
                     <div>
-                        <label class="block font-semibold mb-1">Standard Cost (KES)</label>
+                        <label class="block font-semibold mb-1">Unit Price / Cost (KES)</label>
                         <input type="number" id="new_item_cost" step="0.01" value="100" class="w-full p-2 border rounded-lg text-sm outline-none">
                     </div>
                 </div>
@@ -626,28 +691,6 @@
                 <div class="flex justify-end space-x-2 pt-3 border-t">
                     <button type="button" onclick="document.getElementById('modal-new-item').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-[#0b3b2c] text-white rounded-lg font-semibold hover:bg-[#07281c]">Save Item</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: Add New Donor -->
-    <div id="modal-new-donor" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-            <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Register New Donor</h3>
-            <p class="text-xs text-gray-500 mb-4">Add partner, individual or organisation name</p>
-            <form id="form-create-donor" class="space-y-3 text-xs">
-                <div>
-                    <label class="block font-semibold mb-1">Donor Name</label>
-                    <input type="text" id="new_donor_name" required placeholder="e.g. Rotary Club Nakuru" class="w-full p-2 border rounded-lg text-sm outline-none">
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1">Contact / Details</label>
-                    <input type="text" id="new_donor_contact" placeholder="Phone, email or address" class="w-full p-2 border rounded-lg text-sm outline-none">
-                </div>
-                <div class="flex justify-end space-x-2 pt-3 border-t">
-                    <button type="button" onclick="document.getElementById('modal-new-donor').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-[#e85d04] text-white rounded-lg font-semibold hover:bg-[#d05203]">Save Donor</button>
                 </div>
             </form>
         </div>

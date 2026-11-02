@@ -2,9 +2,12 @@
 const SUPABASE_URL = 'https://vjdqfgjbibocgorruhfj.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_IX8R_VHKZ5pBLokFhl1lxA_JC2ya20s';
 
-// Initialize Client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Safety check: Did the Supabase library load from the internet?
+if (!window.supabase) {
+    alert("System Error: Supabase failed to load. Check your internet connection.");
+}
 
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUserProfile = null;
 
 // DOM Elements
@@ -35,24 +38,18 @@ function updateOnlineStatus() {
 supabase.auth.onAuthStateChange(async (event, session) => {
     if (session) {
         try {
-            // Fetch User Profile
             const { data, error } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
             
-            if (error) {
-                console.error("Profile Fetch Error:", error);
-                throw new Error("Could not find user profile. Did you run the SQL fix query?");
-            }
+            if (error) throw new Error("Could not find user profile. Run the SQL fix query!");
 
             currentUserProfile = data;
             
-            // Show Dashboard
             authSection.classList.add('hidden');
             dashSection.classList.remove('hidden');
             logoutBtn.classList.remove('hidden');
             
             document.getElementById('user-display-role').textContent = `Logged in: ${data.current_staff_name} (${data.role})`;
 
-            // Show Admin Panel if Admin
             if (data.role === 'admin') {
                 adminPanel.classList.remove('hidden');
                 loadAdminUsersTable();
@@ -61,11 +58,9 @@ supabase.auth.onAuthStateChange(async (event, session) => {
             initializeApp();
         } catch (err) {
             alert(`System Alert: ${err.message}`);
-            // Force logout so they don't get stuck in a broken state
             supabase.auth.signOut();
         }
     } else {
-        // Show Login Screen
         authSection.classList.remove('hidden');
         dashSection.classList.add('hidden');
         logoutBtn.classList.add('hidden');
@@ -76,7 +71,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 
 // Explicit Login Submission Handling
 document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Extra safety to stop page reload
+    e.preventDefault(); // Prevents the page from reloading natively
     
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
@@ -92,7 +87,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
             loginBtn.textContent = 'Sign In';
             loginBtn.disabled = false;
         }
-        // If successful, onAuthStateChange takes over automatically
     } catch (err) {
         alert("Critical Error connecting to Supabase: " + err.message);
         loginBtn.textContent = 'Sign In';
@@ -134,7 +128,7 @@ async function loadDropdowns() {
         document.getElementById('donor_id').innerHTML = '<option value="">Select...</option>' + 
             (donors || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
     } catch (e) { 
-        console.warn("Dropdown load failed - check network or DB rules", e); 
+        console.warn("Dropdown load failed - check network", e); 
     }
 }
 
@@ -189,9 +183,8 @@ document.getElementById('movement-form').addEventListener('submit', async (e) =>
     }
 
     const { error } = await supabase.from('stock_movements').insert([payload]);
-    if (error) {
-        alert("Error saving movement: " + error.message);
-    } else {
+    if (error) alert("Error saving movement: " + error.message);
+    else {
         alert('Movement Saved successfully!');
         e.target.reset();
         donationFields.classList.add('hidden');

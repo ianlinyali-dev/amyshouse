@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://vjdqfgjbibocgorruhfj.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_IX8R_VHKZ5pBLokFhl1lxA_JC2ya20s';
+const SUPABASE_URL = 'https://sfrgoujuwmctssszndrs.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_zm8UZ9x6LlQwr-UdCziZ0g_7DbJvBbq';
 
 document.addEventListener('DOMContentLoaded', () => {
     

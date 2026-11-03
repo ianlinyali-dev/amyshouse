@@ -37,7 +37,7 @@
             </div>
         </div>
 
-        <!-- Role-Aware Navigation Tabs -->
+        <!-- Navigation Tabs -->
         <nav id="app-nav-tabs" style="display: none;" class="bg-[#07281c] border-t border-emerald-900/50 px-4">
             <div class="max-w-7xl mx-auto flex space-x-1 overflow-x-auto text-xs font-medium py-1">
                 <button data-tab="tab-stock" class="tab-btn px-3 py-2 rounded text-emerald-200 hover:text-white hover:bg-emerald-900 transition flex items-center gap-1.5 bg-emerald-900 text-white">
@@ -79,28 +79,29 @@
                     AH
                 </div>
                 <h2 class="text-xl font-bold text-[#0b3b2c]">Department Access</h2>
-                <p class="text-xs text-gray-500">Sign in with your department code and credentials</p>
+                <p class="text-xs text-gray-500">Sign in with your role & department credentials</p>
             </div>
             
             <div id="login-error-box" style="display: none;" class="mb-4 text-xs bg-red-50 text-red-700 p-3 rounded-lg border border-red-200"></div>
 
             <form id="login-form" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 mb-1">Select Department</label>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Select Role / Department</label>
                     <select id="auth-dept-code" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
-                        <option value="">Choose department...</option>
-                        <option value="AD001">AD001 - Executive Admin (Dorothy / Management)</option>
-                        <option value="ST001">ST001 - Central Store (Storekeeper - Main Warehouse)</option>
-                        <option value="FC001">FC001 - Family Care Department</option>
-                        <option value="ES001">ES001 - Education Support Department</option>
-                        <option value="EE001">EE001 - Economic Empowerment</option>
-                        <option value="FN001">FN001 - Finance Office</option>
+                        <option value="">Choose role...</option>
+                        <option value="AD001">AD001 - Executive Admin (Dorothy - Supervisory Oversight)</option>
+                        <option value="ST001">ST001 - Central Store (Edward - Main Physical Warehouse)</option>
+                        <option value="AH001">AH001 - Amy's House (Dotty - Residential Department)</option>
+                        <option value="FC001">FC001 - Family Care (Paul)</option>
+                        <option value="ES001">ES001 - Education Support (Teacher Mary)</option>
+                        <option value="EE001">EE001 - Economic Empowerment (Grace)</option>
+                        <option value="FN001">FN001 - Finance Office (David)</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Operator Staff Name</label>
-                    <input type="text" id="auth-staff-name" required placeholder="e.g. Dorothy, Edward, Paul" class="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0b3b2c]">
+                    <input type="text" id="auth-staff-name" required placeholder="e.g. Dorothy, Dotty, Edward, Paul" class="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0b3b2c]">
                 </div>
 
                 <div>
@@ -141,10 +142,8 @@
             </div>
         </section>
 
-        <!-- TAB 1: Stock Balances & Master Organization Inventory -->
+        <!-- TAB 1: Stock Balances -->
         <section id="tab-stock" class="tab-content space-y-4">
-            
-            <!-- Organization Valuation Summary (Admin Only) -->
             <div id="admin-org-summary-bar" style="display: none;" class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div class="bg-white p-3.5 rounded-xl border shadow-sm">
                     <span class="text-xs text-gray-500 font-medium">Total Commodities</span>
@@ -167,7 +166,7 @@
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-bold text-[#0b3b2c]">Central Store & Organization Inventory</h2>
+                        <h2 class="text-lg font-bold text-[#0b3b2c]">Central Store & Department Inventory</h2>
                         <p id="stock-scope-desc" class="text-xs text-gray-500">Live commodities held across departments sorted by category</p>
                     </div>
                     <div class="flex items-center gap-2">
@@ -177,7 +176,6 @@
                     </div>
                 </div>
 
-                <!-- Clean Filtering Toolbar -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t text-xs">
                     <input type="text" id="filter-stock-search" placeholder="🔍 Search commodity name..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
                     <select id="filter-stock-category" class="p-2 border rounded-lg outline-none bg-gray-50 font-semibold text-[#0b3b2c]">
@@ -219,13 +217,13 @@
             </div>
         </section>
 
-        <!-- TAB 2: Record Movement Form (Single & Multi-Item Batch) -->
+        <!-- TAB 2: Record Movement Form -->
         <section id="tab-move" class="tab-content max-w-3xl mx-auto hidden">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-5">
                 <div class="border-b pb-3 flex flex-wrap justify-between items-center gap-2">
                     <div>
                         <h2 class="text-lg font-bold text-[#0b3b2c]">Record Stock Movement</h2>
-                        <p class="text-xs text-gray-500">Record single movements or batch distribute supplies</p>
+                        <p class="text-xs text-gray-500">Inbound supplies enter Central Store; outbound distributes to departments</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button type="button" id="btn-toggle-multi-item" class="text-xs bg-emerald-50 hover:bg-emerald-100 text-[#0b3b2c] border border-emerald-300 px-3 py-1.5 rounded-lg font-bold transition">
@@ -246,7 +244,7 @@
                                 <option value="">Select type...</option>
                                 <option value="Purchase">Purchase (Inflow to Central Store)</option>
                                 <option value="Donation (Amy's House)">Donation for Amy's House (Inflow to Central)</option>
-                                <option value="Donation (Department)">Donation Earmarked for Dept (Inflow)</option>
+                                <option value="Donation (Department)">Donation Earmarked for Department (Inflow)</option>
                                 <option value="Farm Produce">Farm Produce / Harvest (Inflow to Central)</option>
                                 <option value="Transfer to Department">🔄 Central Issue / Transfer to Department</option>
                                 <option value="Weekly Supply">Weekly Supply (Out - Regular Friday)</option>
@@ -275,7 +273,7 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">Officer / Staff Collecting Item</label>
-                                <input type="text" id="recipient_name" placeholder="e.g. Teacher Mary, Paul" class="w-full p-2 border rounded-lg text-sm outline-none">
+                                <input type="text" id="recipient_name" placeholder="e.g. Dotty, Teacher Mary, Paul" class="w-full p-2 border rounded-lg text-sm outline-none">
                             </div>
                         </div>
                     </div>
@@ -322,7 +320,8 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Source Department / Location</label>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Source Department / Storeroom</label>
+                            <!-- AD001 IS REMOVED HERE: AH001 (Amy's House) and ST001 (Central Store) are present -->
                             <select id="department_id" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
                                 <option value="">Select Department...</option>
                             </select>
@@ -397,7 +396,7 @@
                             </div>
                             <div>
                                 <label class="block font-semibold mb-1">Staff Collecting Batch</label>
-                                <input type="text" id="batch_recipient_name" placeholder="Staff name" class="w-full p-2 border rounded-lg bg-white">
+                                <input type="text" id="batch_recipient_name" placeholder="e.g. Dotty, Paul" class="w-full p-2 border rounded-lg bg-white">
                             </div>
                         </div>
                     </div>
@@ -430,7 +429,7 @@
             </div>
         </section>
 
-        <!-- TAB 3: Stock Requisitions & Requests Pipeline -->
+        <!-- TAB 3: Stock Requests Pipeline -->
         <section id="tab-requests" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
@@ -463,7 +462,7 @@
             </div>
         </section>
 
-        <!-- TAB 4: Movement Ledger (Ambiguity Fixed) -->
+        <!-- TAB 4: Movement Ledger (Audited) -->
         <section id="tab-ledger" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -504,7 +503,7 @@
                                 <th class="p-2.5">Type</th>
                                 <th class="p-2.5">Item</th>
                                 <th class="p-2.5">Owner Dept</th>
-                                <th class="p-2.5">Quantity</th>
+                                <th class="p-2.5">Flow & Quantity</th>
                                 <th class="p-2.5">Recipient / Purpose</th>
                                 <th class="p-2.5">Logged By</th>
                             </tr>
@@ -564,7 +563,7 @@
             </div>
         </section>
 
-        <!-- TAB 6: Donors Directory (Admin Only, Sorted by Last Active Date) -->
+        <!-- TAB 6: Donors Directory (Admin Only) -->
         <section id="tab-donors" class="tab-content space-y-4 hidden">
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
@@ -613,7 +612,7 @@
             </div>
         </section>
 
-        <!-- TAB 7: Asset Register (With Admin Waiver Authorization Safeguard) -->
+        <!-- TAB 7: Asset Register -->
         <section id="tab-assets" class="tab-content space-y-4 hidden">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div class="bg-white p-3 rounded-xl border shadow-sm">
@@ -763,10 +762,29 @@
     </main>
 
     <!-- ========================================================================= -->
-    <!-- MODAL DIALOGS -->
+    <!-- MODALS -->
     <!-- ========================================================================= -->
 
-    <!-- MODAL 1: Admin Single Item Quick-Editor -->
+    <!-- INSUFFICIENT STOCK BLOCKING MODAL -->
+    <div id="modal-stock-blocked" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border-t-4 border-red-600 space-y-4">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🚫</span>
+                <div>
+                    <h3 class="text-base font-bold text-red-700">Distribution Blocked: Insufficient Stock!</h3>
+                    <p class="text-xs text-gray-500">Inventory cannot drop below zero.</p>
+                </div>
+            </div>
+            <div id="blocked-stock-details" class="p-3 bg-red-50 rounded-lg text-xs text-red-900 font-mono space-y-1"></div>
+            <p class="text-xs text-gray-600">Please restock or top-up this commodity into the Central Store before attempting distribution.</p>
+            <div class="flex justify-end space-x-2 pt-2 border-t">
+                <button type="button" onclick="document.getElementById('modal-stock-blocked').classList.add('hidden')" class="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-gray-100">Close</button>
+                <button type="button" id="btn-redirect-purchase" class="px-4 py-1.5 bg-[#0b3b2c] hover:bg-[#07281c] text-white text-xs font-semibold rounded-lg">➕ Restock This Item Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Item Edit Modal -->
     <div id="modal-quick-edit-item" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Edit Commodity & Price</h3>
@@ -794,7 +812,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold mb-1">Standard Cost / Price (KES)</label>
+                        <label class="block font-semibold mb-1">Standard Price (KES)</label>
                         <input type="number" id="edit_item_cost" step="0.5" required class="w-full p-2 border rounded-lg text-sm outline-none font-mono">
                     </div>
                     <div>
@@ -804,7 +822,7 @@
                 </div>
                 <div class="flex items-center space-x-2 pt-1">
                     <input type="checkbox" id="edit_item_perishable" class="rounded text-[#0b3b2c]">
-                    <label for="edit_item_perishable" class="font-medium">Perishable commodity (Expiry tracked)</label>
+                    <label for="edit_item_perishable" class="font-medium">Perishable commodity</label>
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t">
                     <button type="button" onclick="document.getElementById('modal-quick-edit-item').classList.add('hidden')" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
@@ -814,7 +832,7 @@
         </div>
     </div>
 
-    <!-- MODAL 2: Admin Authorized Waiver Confirmation (Safeguarded) -->
+    <!-- Admin Waiver Authorization Modal -->
     <div id="modal-admin-waiver" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-3 text-xs">
             <div class="p-2 bg-amber-50 border border-amber-200 rounded-lg">
@@ -832,8 +850,8 @@
                     <input type="number" id="waiver_penalty_amount" disabled class="w-full p-2 border rounded-lg bg-gray-100 text-red-700 font-mono font-bold">
                 </div>
                 <div>
-                    <label class="block font-semibold mb-1">Formal Justification / Reason for Waiver</label>
-                    <input type="text" id="waiver_reason" required placeholder="e.g. Normal wear & tear; student indigent; approved by Dorothy" class="w-full p-2 border rounded-lg outline-none">
+                    <label class="block font-semibold mb-1">Formal Justification for Waiver</label>
+                    <input type="text" id="waiver_reason" required placeholder="e.g. Normal wear & tear; approved by Dorothy" class="w-full p-2 border rounded-lg outline-none">
                 </div>
                 <div>
                     <label class="block font-semibold mb-1">Confirm Admin Password</label>
@@ -847,7 +865,7 @@
         </div>
     </div>
 
-    <!-- MODAL 3: Raise Stock Requisition / Request -->
+    <!-- Requisition Modal -->
     <div id="modal-raise-request" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Raise Department Stock Requisition</h3>
@@ -885,7 +903,7 @@
 
                 <div>
                     <label class="block font-semibold mb-1">Specific Purpose / Notes</label>
-                    <input type="text" id="req_purpose" placeholder="e.g. For Family Care weekend cooking & hygiene" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    <input type="text" id="req_purpose" placeholder="e.g. For Amy's House children weekend meals & hygiene" class="w-full p-2 border rounded-lg text-sm outline-none">
                 </div>
 
                 <div class="flex justify-end space-x-2 pt-3 border-t">
@@ -896,7 +914,7 @@
         </div>
     </div>
 
-    <!-- MODAL 4: Issue Asset to Person -->
+    <!-- Asset Issue Modal -->
     <div id="modal-issue-asset" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Issue Asset Out of Store</h3>
@@ -923,7 +941,7 @@
         </div>
     </div>
 
-    <!-- MODAL 5: Return Asset (Operators can only report condition & penalty pending) -->
+    <!-- Asset Return Modal -->
     <div id="modal-return-asset" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Process Asset Return</h3>
@@ -950,10 +968,9 @@
                     </div>
                 </div>
 
-                <!-- Operator Damage Notice -->
                 <div id="penalty-waiver-block" style="display: none;" class="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
                     <span class="font-bold text-red-900 block">⚠️ Damage / Loss Assessment</span>
-                    <p class="text-gray-500 text-[11px]">Damaged/Lost assets are marked as Penalty Pending. Waivers are strictly authorized by Admin.</p>
+                    <p class="text-gray-500 text-[11px]">Damaged/Lost assets are marked as Penalty Pending. Waivers are strictly authorized by Admin Dorothy.</p>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block font-semibold mb-1">Estimated Repair / Replacement (KES)</label>
@@ -974,11 +991,11 @@
         </div>
     </div>
 
-    <!-- MODAL 6: Add / Edit Donor Modal -->
+    <!-- Donor Modal -->
     <div id="modal-donor-editor" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 id="modal-donor-title" class="text-base font-bold text-[#0b3b2c] mb-1">Register New Donor</h3>
-            <p class="text-xs text-gray-500 mb-4">Permanent donor number will be generated automatically</p>
+            <p class="text-xs text-gray-500 mb-4">Permanent donor code will be generated automatically</p>
             <form id="form-donor-editor" class="space-y-3 text-xs">
                 <input type="hidden" id="edit_donor_id">
                 <div>
@@ -1001,7 +1018,7 @@
         </div>
     </div>
 
-    <!-- MODAL 7: Edit My Profile Modal -->
+    <!-- Profile Modal -->
     <div id="modal-my-profile" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Update Operator Name</h3>
@@ -1023,7 +1040,7 @@
         </div>
     </div>
 
-    <!-- MODAL 8: Add Master Item Modal -->
+    <!-- New Item Modal -->
     <div id="modal-new-item" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Create New Item</h3>
@@ -1070,7 +1087,7 @@
         </div>
     </div>
 
-    <!-- MODAL 9: Add Asset Modal -->
+    <!-- New Asset Modal -->
     <div id="modal-new-asset" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Record Durable Asset</h3>
@@ -1110,7 +1127,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold mb-1">Storage Location</label>
+                        <label class="block font-semibold mb-1">Storage Location in Store</label>
                         <input type="text" id="asset_location" required placeholder="e.g. Store Room / IT Desk" class="w-full p-2 border rounded-lg text-sm outline-none">
                     </div>
                     <div>
@@ -1130,7 +1147,7 @@
         </div>
     </div>
 
-    <!-- MODAL 10: Add Staff Modal -->
+    <!-- New Staff Modal -->
     <div id="modal-new-staff" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Create Staff Account</h3>
@@ -1138,7 +1155,7 @@
             <form id="form-create-staff" class="space-y-3 text-xs">
                 <div>
                     <label class="block font-semibold mb-1">Staff Full Name</label>
-                    <input type="text" id="new_staff_name" required placeholder="e.g. Sarah Mwangi" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    <input type="text" id="new_staff_name" required placeholder="e.g. Dotty, Sarah Mwangi" class="w-full p-2 border rounded-lg text-sm outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
@@ -1156,7 +1173,7 @@
                 </div>
                 <div>
                     <label class="block font-semibold mb-1">Staff Email / Login Identifier</label>
-                    <input type="email" id="new_staff_email" required placeholder="e.g. sarah@amyshouse.org" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    <input type="email" id="new_staff_email" required placeholder="e.g. ah001@amyshouse.org" class="w-full p-2 border rounded-lg text-sm outline-none">
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t">
                     <button type="button" id="btn-cancel-staff-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
@@ -1166,7 +1183,7 @@
         </div>
     </div>
 
-    <!-- MODAL 11: Edit Staff Modal -->
+    <!-- Edit Staff Modal -->
     <div id="modal-edit-staff" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Edit Staff Account</h3>

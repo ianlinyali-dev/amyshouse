@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let cachedAssets = [];
     let cachedStaff = [];
     let cachedAlerts = [];
+    let cachedRequests = [];
 
     let currentUserName = '';
     let currentUserDeptCode = '';
@@ -122,9 +123,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isStorekeeper = currentUserDeptCode === 'ST001';
 
         const roleTitle = isAdmin 
-            ? 'Executive Admin (Full Access)' 
+            ? 'Executive Admin (Oversight & Management)' 
             : isStorekeeper 
-            ? 'Central Storekeeper' 
+            ? 'Central Storekeeper (Main Warehouse)' 
             : `Department Operator [${currentUserDeptCode}]`;
 
         document.getElementById('user-display-role').textContent = `${currentUserName} · ${roleTitle}`;
@@ -150,7 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 2. MODAL WIRING
+    // 2. MODAL & MULTI-ITEM BATCH WIRING
     // --------------------------------------------------------------------------
     function wireAllModalButtons() {
         safeClick('btn-open-new-item-modal', () => showModal('modal-new-item'));
@@ -158,6 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         safeClick('btn-open-add-donor', () => openDonorEditor());
         safeClick('btn-open-asset-modal', () => showModal('modal-new-asset'));
         safeClick('btn-open-new-staff-modal', () => showModal('modal-new-staff'));
+        safeClick('btn-open-request-modal', () => showModal('modal-raise-request'));
         safeClick('btn-open-catalog-edit', () => { renderCatalogEditor(); showModal('modal-catalog-editor'); });
         safeClick('btn-edit-my-profile', () => {
             document.getElementById('my_profile_name').value = currentUserName;
@@ -172,6 +174,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         safeClick('btn-cancel-asset-modal', () => hideModal('modal-new-asset'));
         safeClick('btn-cancel-staff-modal', () => hideModal('modal-new-staff'));
         safeClick('btn-cancel-edit-staff-modal', () => hideModal('modal-edit-staff'));
+
+        // Toggle Single vs Multi-Item Batch Issuance
+        safeClick('btn-toggle-multi-item', () => {
+            const singleForm = document.getElementById('movement-form');
+            const batchSection = document.getElementById('multi-item-batch-section');
+            const btn = document.getElementById('btn-toggle-multi-item');
+
+            const isBatch = !batchSection.classList.contains('hidden');
+            if (isBatch) {
+                batchSection.classList.add('hidden');
+                singleForm.classList.remove('hidden');
+                btn.textContent = '📦 Switch to Multi-Item Batch';
+            } else {
+                singleForm.classList.add('hidden');
+                batchSection.classList.remove('hidden');
+                btn.textContent = '✏️ Switch to Single Movement';
+                if (!document.getElementById('batch-items-table-body').children.length) {
+                    addBatchRow();
+                    addBatchRow();
+                }
+            }
+        });
+
+        // Add Row to Multi-Item Batch Table
+        safeClick('btn-add-batch-row', addBatchRow);
+
+        // Submit Multi-Item Batch
+        safeClick('btn-submit-batch-distribution', submitBatchDistribution);
+
+        // Add Row to Requisition Modal
+        safeClick('btn-add-req-row', () => {
+            const container = document.getElementById('req-items-container');
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-3 gap-2 req-item-row';
+            row.innerHTML = `
+                <div class="col-span-2">
+                    <input list="items-datalist" placeholder="Select Item..." class="w-full p-1.5 border rounded text-xs req-item-input">
+                </div>
+                <div>
+                    <input type="number" step="0.1" min="0.1" placeholder="Quantity" class="w-full p-1.5 border rounded text-xs req-item-qty">
+                </div>
+            `;
+            container.appendChild(row);
+        });
 
         // Toggle Action Centre Drawer
         safeClick('btn-toggle-action-centre', () => {
@@ -200,7 +246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 3. COMPACT ACTION CENTRE (EXPIRY & OUT-OF-STOCK ALERTS)
+    // 3. ACTION CENTRE ALERTS (REQUISITIONS, LOW STOCK & EXPIRY)
     // --------------------------------------------------------------------------
     async function loadActionCentre() {
         const panel = document.getElementById('action-centre-panel');
@@ -220,11 +266,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         cachedAlerts = alerts;
         panel.style.display = 'block';
 
+        const reqCount = alerts.filter(a => a.alert_type === 'REQUEST_PENDING').length;
         const expiredCount = alerts.filter(a => a.alert_type === 'EXPIRED').length;
         const soonCount = alerts.filter(a => a.alert_type === 'EXPIRING_SOON').length;
         const lowCount = alerts.filter(a => a.alert_type === 'LOW_STOCK').length;
 
         pillsContainer.innerHTML = `
+            ${reqCount > 0 ? `<span class="bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full">🔔 ${reqCount} Requisition${reqCount > 1 ? 's' : ''}</span>` : ''}
             ${expiredCount > 0 ? `<span class="bg-red-600 text-white font-bold px-2 py-0.5 rounded-full">🔴 ${expiredCount} Expired</span>` : ''}
             ${soonCount > 0 ? `<span class="bg-amber-100 text-amber-900 border border-amber-300 font-semibold px-2 py-0.5 rounded-full">🟡 ${soonCount} Expiring Soon</span>` : ''}
             ${lowCount > 0 ? `<span class="bg-orange-100 text-orange-900 border border-orange-300 font-semibold px-2 py-0.5 rounded-full">🟠 ${lowCount} Low Stock</span>` : ''}
@@ -248,13 +296,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         container.innerHTML = list.map(a => {
+            const isReq = a.alert_type === 'REQUEST_PENDING';
             const isExpired = a.alert_type === 'EXPIRED';
             const isLow = a.alert_type === 'LOW_STOCK';
 
             return `
-                <div class="py-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div class="py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+                            isReq ? 'bg-blue-600 text-white' :
                             isExpired ? 'bg-red-600 text-white' : 
                             isLow ? 'bg-orange-100 text-orange-900' : 
                             'bg-amber-100 text-amber-900'
@@ -266,21 +316,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <span class="text-xs text-gray-600">${a.alert_message}</span>
                     </div>
                     <div>
-                        <button onclick="window.handleActionCentreAlert('${a.item_id}', '${a.item_name}', '${isExpired ? 'Spoilage or Loss' : isLow ? 'Purchase' : 'Weekly Supply'}')" class="text-xs font-semibold px-2.5 py-1 rounded transition ${isExpired ? 'bg-red-700 hover:bg-red-800 text-white' : 'bg-[#0b3b2c] hover:bg-[#07281c] text-white'}">
-                            ${isExpired ? 'Write off Spoilage' : isLow ? 'Order More' : 'Prioritize (FIFO)'}
-                        </button>
+                        ${isReq ? 
+                            `<button onclick="window.viewRequisitionsTab()" class="text-xs font-semibold px-2.5 py-1 rounded bg-blue-700 hover:bg-blue-800 text-white">Review Request</button>` :
+                            `<button onclick="window.handleActionCentreAlert('${a.item_id}', '${a.item_name}', '${isExpired ? 'Spoilage or Loss' : isLow ? 'Purchase' : 'Weekly Supply'}')" class="text-xs font-semibold px-2.5 py-1 rounded transition ${isExpired ? 'bg-red-700 hover:bg-red-800 text-white' : 'bg-[#0b3b2c] hover:bg-[#07281c] text-white'}">
+                                ${isExpired ? 'Write off Spoilage' : isLow ? 'Order More' : 'Prioritize (FIFO)'}
+                            </button>`
+                        }
                     </div>
                 </div>
             `;
         }).join('');
     }
 
+    window.viewRequisitionsTab = () => {
+        document.querySelector('[data-tab="tab-requests"]').click();
+    };
+
     window.handleActionCentreAlert = (itemId, itemName, recommendedMovement) => {
         document.querySelector('[data-tab="tab-move"]').click();
         document.getElementById('movement_type').value = recommendedMovement;
         document.getElementById('movement_type').dispatchEvent(new Event('change'));
 
-        // Pre-fill searchable input
         const item = cachedItems.find(i => i.id === itemId);
         if (item) {
             document.getElementById('item_search_input').value = `${item.name} (${item.unit})`;
@@ -305,6 +361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (targetId === 'tab-stock') loadStockBalances();
                 if (targetId === 'tab-move') checkAndGenerateDonationRef();
+                if (targetId === 'tab-requests') loadRequisitions();
                 if (targetId === 'tab-ledger') loadLedgerRecords();
                 if (targetId === 'tab-donations') loadDonationRegister();
                 if (targetId === 'tab-donors') loadDonorsDirectory();
@@ -316,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 5. MASTER DATA & SEARCHABLE AUTOCOMPLETE COMBOBOXES
+    // 5. MASTER DATA & SEARCHABLE DROPDOWNS
     // --------------------------------------------------------------------------
     async function loadMasterMetadata() {
         try {
@@ -340,6 +397,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function populateDropdowns() {
         const deptSelect = document.getElementById('department_id');
         const transferDestSelect = document.getElementById('transfer_dest_dept_id');
+        const batchDestSelect = document.getElementById('batch_dest_dept_id');
         const assetDeptSelect = document.getElementById('asset_dept_id');
         const newStaffDeptSelect = document.getElementById('new_staff_dept');
         const editStaffDeptSelect = document.getElementById('edit_staff_dept');
@@ -347,11 +405,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         const filterLedgerDept = document.getElementById('filter-ledger-dept');
         const filterAssetsDept = document.getElementById('filter-assets-dept');
 
-        // Populate Inter-Department Transfer Destination
-        transferDestSelect.innerHTML = '<option value="">Select Destination Department...</option>' + 
-            cachedDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+        // Central Store is the universal physical hub
+        const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
+        const storeDeptId = storeDept ? storeDept.id : '';
 
-        if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+        // Destination departments (exclude central store itself)
+        const recipientDeptOptions = '<option value="">Select Destination Department...</option>' + 
+            cachedDepts.filter(d => d.dept_code !== 'ST001').map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+
+        transferDestSelect.innerHTML = recipientDeptOptions;
+        if (batchDestSelect) batchDestSelect.innerHTML = recipientDeptOptions;
+
+        if (currentUserDeptCode === 'AD001' || currentUserDeptCode === 'ST001') {
+            // Admin & Storekeeper manage Central Store by default
+            deptSelect.innerHTML = `<option value="${storeDeptId}">Central Store (Main Warehouse)</option>` + 
+                cachedDepts.filter(d => d.dept_code !== 'ST001').map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+            deptSelect.disabled = false;
+
+            assetDeptSelect.innerHTML = cachedDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+            assetDeptSelect.disabled = false;
+
+            const filterOptions = '<option value="ALL">All Departments</option>' + 
+                cachedDepts.map(d => `<option value="${d.dept_code}">${d.name}</option>`).join('');
+
+            filterStockDept.innerHTML = filterOptions;
+            filterLedgerDept.innerHTML = filterOptions;
+            filterAssetsDept.innerHTML = filterOptions;
+        } else {
+            // Department Operators restricted to own department
             const myDept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
             if (myDept) {
                 deptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
@@ -369,22 +450,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 filterAssetsDept.innerHTML = `<option value="${myDept.dept_code}">${myDept.name}</option>`;
                 filterAssetsDept.disabled = true;
             }
-        } else {
-            const deptOptions = '<option value="">Select Department...</option>' + 
-                cachedDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
-
-            deptSelect.innerHTML = deptOptions;
-            deptSelect.disabled = false;
-
-            assetDeptSelect.innerHTML = deptOptions;
-            assetDeptSelect.disabled = false;
-
-            const filterOptions = '<option value="ALL">All Departments</option>' + 
-                cachedDepts.map(d => `<option value="${d.dept_code}">${d.name}</option>`).join('');
-
-            filterStockDept.innerHTML = filterOptions;
-            filterLedgerDept.innerHTML = filterOptions;
-            filterAssetsDept.innerHTML = filterOptions;
         }
 
         if (newStaffDeptSelect) newStaffDeptSelect.innerHTML = cachedDepts.map(d => `<option value="${d.dept_code}">${d.name} (${d.dept_code})</option>`).join('');
@@ -392,16 +457,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function populateSearchableComboboxes() {
-        // Items Autocomplete Datalist
         const itemsDatalist = document.getElementById('items-datalist');
         itemsDatalist.innerHTML = cachedItems.map(i => `<option data-id="${i.id}" value="${i.name} (${i.unit})"></option>`).join('');
 
-        // Donors Autocomplete Datalist
         const donorsDatalist = document.getElementById('donors-datalist');
         donorsDatalist.innerHTML = cachedDonors.map(dn => `<option data-id="${dn.id}" value="[${dn.donor_code || 'DNR'}] ${dn.name}"></option>`).join('');
     }
 
-    // Connect Combobox typed values to hidden UUID fields
+    // Connect Combobox inputs to hidden UUID values
     document.getElementById('item_search_input').addEventListener('input', (e) => {
         const val = e.target.value.trim();
         const matched = cachedItems.find(i => `${i.name} (${i.unit})`.toLowerCase() === val.toLowerCase() || i.name.toLowerCase() === val.toLowerCase());
@@ -463,7 +526,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('department_id').addEventListener('change', checkAndGenerateDonationRef);
 
-    // Movement Form Dynamics: Reveal Transfer Destination or Donation Fields
     document.getElementById('movement_type').addEventListener('change', async (e) => {
         const val = e.target.value;
         const donationFields = document.getElementById('donation-fields');
@@ -484,7 +546,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 7. RECORD STOCK MOVEMENT & INTER-DEPARTMENT TRANSFER
+    // 7. RECORD SINGLE STOCK MOVEMENT
     // --------------------------------------------------------------------------
     document.getElementById('movement-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -493,16 +555,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isDonation = moveType.startsWith('Donation');
         const isTransfer = moveType === 'Transfer to Department';
 
-        // Extract and validate UUIDs strictly
-        const rawItemId = document.getElementById('item_id').value;
-        const rawDeptId = document.getElementById('department_id').value;
-        const rawDonorId = document.getElementById('donor_id').value;
-        const rawDestDeptId = document.getElementById('transfer_dest_dept_id').value;
-
-        const itemId = toValidUUID(rawItemId);
-        const deptId = toValidUUID(rawDeptId);
-        const donorId = toValidUUID(rawDonorId);
-        const destDeptId = toValidUUID(rawDestDeptId);
+        const itemId = toValidUUID(document.getElementById('item_id').value);
+        const deptId = toValidUUID(document.getElementById('department_id').value);
+        const donorId = toValidUUID(document.getElementById('donor_id').value);
+        const destDeptId = toValidUUID(document.getElementById('transfer_dest_dept_id').value);
 
         if (!itemId) {
             alert('Please type and select a valid item from the catalogue list.');
@@ -528,7 +584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const reasonText = document.getElementById('reason').value.trim();
         const recipientName = document.getElementById('recipient_name').value.trim();
 
-        // Check Available Balance on Out Movements
+        // Check Balance on Out Movements
         if (direction === 'Out') {
             const { data: balanceCheck } = await supabase
                 .from('current_stock_balances')
@@ -539,7 +595,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const currentAvailable = balanceCheck ? balanceCheck.balance : 0;
             if (quantity > currentAvailable) {
-                if (!confirm(`Warning: Only ${currentAvailable} available in stock for this department. Record anyway as an authorized adjustment?`)) {
+                if (!confirm(`Warning: Only ${currentAvailable} in stock for this department. Record anyway as an authorized adjustment?`)) {
                     return;
                 }
             }
@@ -550,7 +606,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveBtn.textContent = 'Saving Movement...';
 
         try {
-            // Primary Movement Payload
             const payload = {
                 item_id: itemId,
                 department_id: deptId,
@@ -561,7 +616,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 total_cost: totalCost,
                 reason_category: document.getElementById('reason_category').value || null,
                 people_count: parseInt(document.getElementById('people_count').value) || null,
-                reason: reasonText || (isTransfer ? `Transfer to ${cachedDepts.find(d => d.id === destDeptId)?.name}` : null),
+                reason: reasonText || (isTransfer ? `Issue to ${cachedDepts.find(d => d.id === destDeptId)?.name}` : null),
                 notes: reasonText || null,
                 recipient_name: recipientName || null,
                 transfer_to_dept_id: isTransfer ? destDeptId : null,
@@ -578,7 +633,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { error } = await supabase.from('stock_movements').insert([payload]);
             if (error) throw error;
 
-            // If Inter-Department Transfer, automatically create the Inflow into destination
+            // Inter-Department Transfer: add to destination department
             if (isTransfer) {
                 const destinationPayload = {
                     item_id: itemId,
@@ -596,7 +651,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await supabase.from('stock_movements').insert([destinationPayload]);
             }
 
-            alert(isTransfer ? 'Transfer completed! Stock moved to destination department.' : 'Movement saved successfully!');
+            alert(isTransfer ? 'Transfer completed! Stock issued to department.' : 'Movement saved successfully!');
             document.getElementById('movement-form').reset();
             document.getElementById('item_id').value = '';
             document.getElementById('donor_id').value = '';
@@ -614,7 +669,313 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 8. ASSET REGISTER: ISSUE, RETURN & PENALTY WORKFLOW
+    // 8. MULTI-ITEM BATCH DISTRIBUTION
+    // --------------------------------------------------------------------------
+    function addBatchRow() {
+        const tbody = document.getElementById('batch-items-table-body');
+        const tr = document.createElement('tr');
+        tr.className = 'batch-row border-b';
+        tr.innerHTML = `
+            <td class="p-2">
+                <input list="items-datalist" placeholder="Type or select commodity..." class="w-full p-1.5 border rounded text-xs batch-item-input">
+            </td>
+            <td class="p-2 font-mono text-gray-500 batch-item-avail">—</td>
+            <td class="p-2">
+                <input type="number" step="0.1" min="0.1" placeholder="Qty" class="w-24 p-1.5 border rounded text-xs font-bold text-[#0b3b2c] batch-item-qty">
+            </td>
+            <td class="p-2 text-right">
+                <button type="button" onclick="this.closest('tr').remove(); window.updateBatchCount();" class="text-red-600 font-bold hover:text-red-800 text-sm">✕</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+
+        // Wire availability lookup when item selected
+        const input = tr.querySelector('.batch-item-input');
+        input.addEventListener('input', (e) => {
+            const val = e.target.value.trim().toLowerCase();
+            const matched = cachedItems.find(i => `${i.name} (${i.unit})`.toLowerCase() === val || i.name.toLowerCase() === val);
+            const availCell = tr.querySelector('.batch-item-avail');
+            if (matched) {
+                tr.dataset.itemId = matched.id;
+                const balanceRec = cachedBalances.find(b => b.item_id === matched.id && b.dept_code === 'ST001');
+                const qty = balanceRec ? balanceRec.balance : 0;
+                availCell.textContent = `${qty} ${matched.unit}`;
+                if (qty <= 0) availCell.classList.add('text-red-600');
+            } else {
+                tr.dataset.itemId = '';
+                availCell.textContent = '—';
+            }
+        });
+
+        window.updateBatchCount();
+    }
+
+    window.updateBatchCount = () => {
+        const count = document.querySelectorAll('.batch-row').length;
+        document.getElementById('batch-row-count').textContent = `${count} commodity item${count !== 1 ? 's' : ''} in batch`;
+    };
+
+    async function submitBatchDistribution() {
+        const destDeptId = toValidUUID(document.getElementById('batch_dest_dept_id').value);
+        const moveType = document.getElementById('batch_movement_type').value;
+        const recipient = document.getElementById('batch_recipient_name').value.trim();
+
+        if (!destDeptId) return alert('Please select the receiving department for this batch.');
+        if (!recipient) return alert('Please enter the name of the staff member collecting this batch.');
+
+        const rows = document.querySelectorAll('.batch-row');
+        if (!rows.length) return alert('Please add at least one item row to the batch.');
+
+        const batchRef = `BATCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+        const movementsToInsert = [];
+
+        const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
+        const storeDeptId = storeDept ? storeDept.id : '';
+
+        for (const row of rows) {
+            const itemId = toValidUUID(row.dataset.itemId);
+            const qty = parseFloat(row.querySelector('.batch-item-qty').value);
+
+            if (!itemId || isNaN(qty) || qty <= 0) {
+                alert('Please ensure all commodity rows have a valid item and quantity selected.');
+                return;
+            }
+
+            // Outflow from Central Store
+            movementsToInsert.push({
+                item_id: itemId,
+                department_id: storeDeptId,
+                movement_type: moveType,
+                direction: 'Out',
+                quantity: qty,
+                recipient_name: recipient,
+                transfer_to_dept_id: destDeptId,
+                batch_ref: batchRef,
+                reason: `Batch distribution (${batchRef}) issued to ${cachedDepts.find(d => d.id === destDeptId)?.name}`,
+                performed_by_name: currentUserName,
+                performed_by_email: currentUserEmail,
+                performed_by_dept: currentUserDeptCode
+            });
+
+            // Inflow into Destination Department
+            movementsToInsert.push({
+                item_id: itemId,
+                department_id: destDeptId,
+                movement_type: moveType,
+                direction: 'In',
+                quantity: qty,
+                recipient_name: recipient,
+                batch_ref: batchRef,
+                reason: `Batch receipt (${batchRef}) collected by ${recipient}`,
+                performed_by_name: currentUserName,
+                performed_by_email: currentUserEmail,
+                performed_by_dept: currentUserDeptCode
+            });
+        }
+
+        const submitBtn = document.getElementById('btn-submit-batch-distribution');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving Batch Distribution...';
+
+        try {
+            const { error } = await supabase.from('stock_movements').insert(movementsToInsert);
+            if (error) throw error;
+
+            alert(`Batch ${batchRef} successfully issued to department! All items updated.`);
+            document.getElementById('batch-items-table-body').innerHTML = '';
+            document.getElementById('batch_recipient_name').value = '';
+            window.updateBatchCount();
+
+            // Switch back to single movement
+            document.getElementById('btn-toggle-multi-item').click();
+            await loadMasterMetadata();
+            refreshAllViews();
+        } catch (err) {
+            alert('Error saving batch: ' + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Confirm & Save All Batch Movements';
+        }
+    }
+
+    // --------------------------------------------------------------------------
+    // 9. REQUISITION & REQUESTS PIPELINE
+    // --------------------------------------------------------------------------
+    document.getElementById('form-raise-request').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        let reqDeptId = null;
+        if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+            reqDeptId = cachedDepts.find(d => d.dept_code === currentUserDeptCode)?.id;
+        } else {
+            reqDeptId = cachedDepts.find(d => d.dept_code === 'FC001')?.id;
+        }
+
+        if (!reqDeptId) return alert('Department could not be identified.');
+
+        const rows = document.querySelectorAll('.req-item-row');
+        const itemsToRequest = [];
+
+        rows.forEach(r => {
+            const val = r.querySelector('.req-item-input').value.trim().toLowerCase();
+            const matched = cachedItems.find(i => `${i.name} (${i.unit})`.toLowerCase() === val || i.name.toLowerCase() === val);
+            const qty = parseFloat(r.querySelector('.req-item-qty').value);
+            if (matched && qty > 0) {
+                itemsToRequest.push({ item_id: matched.id, quantity_requested: qty });
+            }
+        });
+
+        if (!itemsToRequest.length) return alert('Please add at least one item and quantity to your requisition.');
+
+        const requestPayload = {
+            requesting_dept_id: reqDeptId,
+            requested_by_name: currentUserName,
+            pickup_date: document.getElementById('req_pickup_date').value,
+            urgency: document.getElementById('req_urgency').value,
+            purpose: document.getElementById('req_purpose').value.trim() || 'Department requisition',
+            status: 'Pending'
+        };
+
+        const { data: requestRec, error: reqError } = await supabase.from('stock_requests').insert([requestPayload]).select().single();
+        if (reqError) return alert('Error creating requisition: ' + reqError.message);
+
+        // Insert items
+        const itemPayloads = itemsToRequest.map(item => ({
+            request_id: requestRec.id,
+            item_id: item.item_id,
+            quantity_requested: item.quantity_requested
+        }));
+
+        await supabase.from('stock_request_items').insert(itemPayloads);
+
+        alert(`Requisition ${requestRec.request_code} successfully submitted to Central Store!`);
+        document.getElementById('form-raise-request').reset();
+        hideModal('modal-raise-request');
+        loadRequisitions();
+        loadActionCentre();
+    });
+
+    async function loadRequisitions() {
+        const tbody = document.getElementById('requests-table-body');
+        let query = supabase.from('stock_requests').select('*, departments(name, dept_code), stock_request_items(*, items(name, unit))').order('created_at', { ascending: false });
+
+        if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+            const myDept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
+            if (myDept) query = query.eq('requesting_dept_id', myDept.id);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+            return;
+        }
+
+        cachedRequests = data || [];
+        if (!cachedRequests.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400">No requisitions submitted yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = cachedRequests.map(r => {
+            const isPending = r.status === 'Pending';
+            const itemsList = r.stock_request_items.map(it => `• ${it.items?.name || 'Item'}: <strong>${it.quantity_requested} ${it.items?.unit || ''}</strong>`).join('<br>');
+            const canManage = currentUserDeptCode === 'AD001' || currentUserDeptCode === 'ST001';
+
+            return `
+                <tr class="hover:bg-gray-50 border-b">
+                    <td class="p-2.5 font-mono font-bold text-blue-900">${r.request_code}</td>
+                    <td class="p-2.5 text-xs text-gray-700 font-semibold">${r.departments?.name}</td>
+                    <td class="p-2.5 text-xs">${r.requested_by_name}</td>
+                    <td class="p-2.5 text-xs font-mono">${r.pickup_date || 'Flexible'}</td>
+                    <td class="p-2.5">
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold ${r.urgency === 'Urgent' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">
+                            ${r.urgency}
+                        </span>
+                    </td>
+                    <td class="p-2.5 text-xs">${itemsList}</td>
+                    <td class="p-2.5">
+                        <span class="px-2 py-0.5 rounded text-xs font-semibold ${
+                            r.status === 'Fulfilled' ? 'bg-green-100 text-green-800' :
+                            r.status === 'Pending' ? 'bg-amber-100 text-amber-800 font-bold animate-pulse' : 'bg-gray-100 text-gray-600'
+                        }">
+                            ${r.status}
+                        </span>
+                    </td>
+                    <td class="p-2.5 text-right space-x-1">
+                        ${canManage && isPending ? `
+                            <button onclick="window.fulfillRequisition('${r.id}')" class="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2.5 py-1 rounded">Fulfill</button>
+                            <button onclick="window.declineRequisition('${r.id}')" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded">Decline</button>
+                        ` : '<span class="text-gray-400 text-xs">—</span>'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // 1-Click Requisition Fulfillment
+    window.fulfillRequisition = async (reqId) => {
+        const req = cachedRequests.find(r => r.id === reqId);
+        if (!req) return;
+
+        if (!confirm(`Fulfill requisition ${req.request_code} for ${req.departments?.name}? This will automatically deduct Central Store stock and issue items to the department.`)) {
+            return;
+        }
+
+        const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
+        const storeDeptId = storeDept ? storeDept.id : '';
+        const movementsToInsert = [];
+
+        for (const it of req.stock_request_items) {
+            // Out from Central Store
+            movementsToInsert.push({
+                item_id: it.item_id,
+                department_id: storeDeptId,
+                movement_type: 'Transfer to Department',
+                direction: 'Out',
+                quantity: it.quantity_requested,
+                recipient_name: req.requested_by_name,
+                transfer_to_dept_id: req.requesting_dept_id,
+                reason: `Requisition fulfillment (${req.request_code}) issued to ${req.departments?.name}`,
+                performed_by_name: currentUserName,
+                performed_by_email: currentUserEmail,
+                performed_by_dept: currentUserDeptCode
+            });
+
+            // In to Receiving Department
+            movementsToInsert.push({
+                item_id: it.item_id,
+                department_id: req.requesting_dept_id,
+                movement_type: 'Transfer to Department',
+                direction: 'In',
+                quantity: it.quantity_requested,
+                recipient_name: req.requested_by_name,
+                reason: `Requisition receipt (${req.request_code}) from Central Store`,
+                performed_by_name: currentUserName,
+                performed_by_email: currentUserEmail,
+                performed_by_dept: currentUserDeptCode
+            });
+        }
+
+        const { error: moveErr } = await supabase.from('stock_movements').insert(movementsToInsert);
+        if (moveErr) return alert('Error generating fulfillment movements: ' + moveErr.message);
+
+        // Mark requisition as fulfilled
+        await supabase.from('stock_requests').update({ status: 'Fulfilled' }).eq('id', reqId);
+
+        alert(`Requisition ${req.request_code} fulfilled successfully! Stock balances updated.`);
+        loadRequisitions();
+        refreshAllViews();
+    };
+
+    window.declineRequisition = async (reqId) => {
+        if (!confirm('Decline this requisition?')) return;
+        await supabase.from('stock_requests').update({ status: 'Declined' }).eq('id', reqId);
+        loadRequisitions();
+        loadActionCentre();
+    };
+
+    // --------------------------------------------------------------------------
+    // 10. ASSET REGISTER: ISSUE, RETURN & PENALTY WORKFLOW
     // --------------------------------------------------------------------------
     async function loadAssets() {
         const tbody = document.getElementById('assets-table-body');
@@ -676,7 +1037,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         tbody.innerHTML = filtered.map(a => {
             const isIssued = a.status === 'Issued Out';
-            const isDamaged = a.status === 'Damaged';
 
             return `
                 <tr class="hover:bg-gray-50 border-b">
@@ -709,7 +1069,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
-    // Modal Handlers for Asset Issue & Return
     window.openIssueModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
@@ -782,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 9. CREATE ITEM, DONOR & ASSET SUBMISSIONS
+    // 11. ITEM, DONOR & PROFILE SUBMISSIONS
     // --------------------------------------------------------------------------
     document.getElementById('form-create-item').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -805,7 +1164,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideModal('modal-new-item');
             await loadMasterMetadata();
 
-            // Seamlessly prefill in Movement form
             if (data && data.id) {
                 document.getElementById('item_search_input').value = `${data.name} (${data.unit})`;
                 document.getElementById('item_id').value = data.id;
@@ -844,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 10. DONORS DIRECTORY & SORTING (ADMIN ONLY)
+    // 12. DONORS DIRECTORY & SORTING (ADMIN ONLY)
     // --------------------------------------------------------------------------
     function openDonorEditor(donorId = null) {
         document.getElementById('form-donor-editor').reset();
@@ -963,7 +1321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('sort-donor-activity').addEventListener('change', renderDonorsTable);
 
     // --------------------------------------------------------------------------
-    // 11. REPLENISHMENT LIST (UNIVERSAL)
+    // 13. REPLENISHMENT LIST (UNIVERSAL)
     // --------------------------------------------------------------------------
     async function loadReplenishmentList() {
         const tbody = document.getElementById('replenishment-table-body');
@@ -1009,7 +1367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 12. CATALOG & PRICING EDITOR
+    // 14. CATALOG & PRICING EDITOR
     // --------------------------------------------------------------------------
     function renderCatalogEditor() {
         const tbody = document.getElementById('catalog-editor-table-body');
@@ -1047,7 +1405,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --------------------------------------------------------------------------
-    // 13. STOCK BALANCES & MOVEMENT LEDGER
+    // 15. STOCK BALANCES & MOVEMENT LEDGER
     // --------------------------------------------------------------------------
     async function loadStockBalances() {
         const tbody = document.getElementById('balances-table-body');
@@ -1128,7 +1486,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { data, error } = await query;
         if (error) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
             return;
         }
 
@@ -1145,6 +1503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const filtered = cachedMovements.filter(m => {
             const matchesSearch = !search || 
+                (m.txn_code && m.txn_code.toLowerCase().includes(search)) ||
                 (m.items?.name && m.items.name.toLowerCase().includes(search)) ||
                 (m.performed_by_name && m.performed_by_name.toLowerCase().includes(search)) ||
                 (m.recipient_name && m.recipient_name.toLowerCase().includes(search)) ||
@@ -1158,7 +1517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center p-6 text-gray-400">No ledger records match filters.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-gray-400">No ledger records match filters.</td></tr>';
             return;
         }
 
@@ -1167,6 +1526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isIn = m.direction === 'In';
             return `
                 <tr class="hover:bg-gray-50 border-b">
+                    <td class="p-2.5 font-mono font-bold text-gray-700">${m.txn_code || '—'}</td>
                     <td class="p-2.5 text-gray-500 whitespace-nowrap">${dateStr}</td>
                     <td class="p-2.5">
                         <span class="px-2 py-0.5 rounded text-xs font-semibold ${
@@ -1349,7 +1709,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 14. FILTERS & EVENT LISTENERS
+    // 16. FILTERS & EVENT LISTENERS
     // --------------------------------------------------------------------------
     function setupFilters() {
         ['filter-stock-search', 'filter-stock-dept', 'filter-stock-category', 'filter-stock-health'].forEach(id => {
@@ -1377,6 +1737,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadActionCentre();
         loadStockBalances();
         loadLedgerRecords();
+        loadRequisitions();
         loadReplenishmentList();
         loadAssets();
         if (currentUserDeptCode === 'AD001') {
@@ -1387,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 15. CSV EXPORT UTILITIES
+    // 17. CSV EXPORT UTILITIES
     // --------------------------------------------------------------------------
     function downloadCSV(csvContent, fileName) {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1428,7 +1789,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data } = await supabase.from('current_stock_balances').select('*');
         if (!data || !data.length) return alert('No stock data to export.');
 
-        let csv = 'Item Name,Category,Department,Balance,Unit,Reorder Level,Current Price\n';
+        let csv = 'Item Name,Category,Storage Location,Balance,Unit,Reorder Level,Current Price\n';
         data.forEach(r => {
             csv += `"${r.item_name}","${r.category}","${r.department_name}",${r.balance},"${r.unit}",${r.reorder_level},${r.standard_cost}\n`;
         });
@@ -1439,9 +1800,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data } = await supabase.from('stock_movements').select('*, items(name, unit), departments(name)');
         if (!data || !data.length) return alert('No movements to export.');
 
-        let csv = 'Timestamp,Movement Type,Direction,Item,Quantity,Unit,Department,Recipient / Purpose,Reason,Operator Name,Operator Account\n';
+        let csv = 'Txn Code,Timestamp,Movement Type,Direction,Item,Quantity,Unit,Department,Recipient / Purpose,Reason,Operator Name,Operator Account\n';
         data.forEach(m => {
-            csv += `"${m.created_at}","${m.movement_type}","${m.direction}","${m.items?.name}",${m.quantity},"${m.items?.unit}","${m.departments?.name}","${m.recipient_name || ''}","${m.reason || ''}","${m.performed_by_name}","${m.performed_by_email}"\n`;
+            csv += `"${m.txn_code || ''}","${m.created_at}","${m.movement_type}","${m.direction}","${m.items?.name}",${m.quantity},"${m.items?.unit}","${m.departments?.name}","${m.recipient_name || ''}","${m.reason || ''}","${m.performed_by_name}","${m.performed_by_email}"\n`;
         });
         downloadCSV(csv, `Amys_House_Audit_Ledger_${new Date().toISOString().slice(0,10)}.csv`);
     });
@@ -1470,7 +1831,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 16. NETWORK STATUS MONITOR
+    // 18. NETWORK STATUS MONITOR
     // --------------------------------------------------------------------------
     const syncStatus = document.getElementById('sync-status');
     window.addEventListener('online', () => {

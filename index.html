@@ -136,7 +136,7 @@
                     <button type="button" onclick="window.filterActionCentre('ALL')" class="ac-filter-btn px-2 py-0.5 rounded bg-gray-200 font-semibold text-gray-800">All</button>
                     <button type="button" onclick="window.filterActionCentre('REQUEST_PENDING')" class="ac-filter-btn px-2 py-0.5 rounded hover:bg-gray-100 text-blue-700">Requisitions</button>
                     <button type="button" onclick="window.filterActionCentre('EXPIRED')" class="ac-filter-btn px-2 py-0.5 rounded hover:bg-gray-100 text-red-700">Expired</button>
-                    <button type="button" onclick="window.filterActionCentre('LOW_STOCK')" class="ac-filter-btn px-2 py-0.5 rounded hover:bg-gray-100 text-orange-700">Low Stock</button>
+                    <button type="button" onclick="window.filterActionCentre('LOW_STOCK')" class="ac-filter-btn px-2 py-0.5 rounded hover:bg-gray-100 text-orange-700">Low / Out of Stock</button>
                 </div>
                 <div id="action-centre-items" class="max-h-60 overflow-y-auto divide-y divide-gray-100 text-xs"></div>
             </div>
@@ -176,6 +176,7 @@
                     </div>
                 </div>
 
+                <!-- Comprehensive Stock Level & Depletion Filters -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t text-xs">
                     <input type="text" id="filter-stock-search" placeholder="🔍 Search commodity name..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
                     <select id="filter-stock-category" class="p-2 border rounded-lg outline-none bg-gray-50 font-semibold text-[#0b3b2c]">
@@ -188,10 +189,12 @@
                     <select id="filter-stock-dept" class="p-2 border rounded-lg outline-none bg-gray-50">
                         <option value="ALL">All Locations</option>
                     </select>
-                    <select id="filter-stock-health" class="p-2 border rounded-lg outline-none bg-gray-50">
+                    <select id="filter-stock-health" class="p-2 border rounded-lg outline-none bg-gray-50 font-semibold">
                         <option value="ALL">All Stock Levels</option>
-                        <option value="LOW">⚠️ Low Stock Only</option>
-                        <option value="HEALTHY">✓ Healthy Only</option>
+                        <option value="IN_STOCK">📦 In Stock (> 0 Only)</option>
+                        <option value="LOW">⚠️ Low Stock (At or Below Threshold)</option>
+                        <option value="OUT_OF_STOCK">🔴 Depleted / Out of Stock (0 Only)</option>
+                        <option value="HEALTHY">✓ Healthy Stock Only</option>
                     </select>
                 </div>
             </div>
@@ -207,7 +210,7 @@
                                 <th class="p-3">Current Balance</th>
                                 <th class="p-3">Unit Price</th>
                                 <th class="p-3">Valuation</th>
-                                <th class="p-3">Status</th>
+                                <th class="p-3">Stock Status</th>
                                 <th class="p-3 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -321,7 +324,6 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Source Department / Storeroom</label>
-                            <!-- AD001 IS REMOVED HERE: AH001 (Amy's House) and ST001 (Central Store) are present -->
                             <select id="department_id" required class="w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-[#0b3b2c] outline-none">
                                 <option value="">Select Department...</option>
                             </select>
@@ -477,7 +479,7 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t text-xs">
                     <input type="text" id="filter-ledger-search" placeholder="🔍 Search item, operator, reason, or TXN code..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
-                    <select id="filter-ledger-type" class="p-2 border rounded-lg outline-none bg-gray-50">
+                    <select id="filter-ledger-type" class="p-2 border rounded-lg outline-none bg-gray-50 font-semibold">
                         <option value="ALL">All Movement Types</option>
                         <option value="Top-up">Top-ups Only</option>
                         <option value="Weekly Supply">Weekly Supplies</option>
@@ -487,7 +489,7 @@
                         <option value="Spoilage or Loss">Spoilage / Loss</option>
                     </select>
                     <select id="filter-ledger-dept" class="p-2 border rounded-lg outline-none bg-gray-50">
-                        <option value="ALL">All Departments</option>
+                        <option value="ALL">All Storage Locations</option>
                     </select>
                     <input type="date" id="filter-ledger-date" class="p-2 border rounded-lg outline-none bg-gray-50">
                 </div>
@@ -612,7 +614,7 @@
             </div>
         </section>
 
-        <!-- TAB 7: Asset Register -->
+        <!-- TAB 7: Asset Register (Tracking by Unique Serial/Tag) -->
         <section id="tab-assets" class="tab-content space-y-4 hidden">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div class="bg-white p-3 rounded-xl border shadow-sm">
@@ -636,8 +638,8 @@
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-bold text-[#0b3b2c]">Durable Asset Register & Custody Tracking</h2>
-                        <p class="text-xs text-gray-500">Track equipment location, custody handovers, returns, and damages</p>
+                        <h2 class="text-lg font-bold text-[#0b3b2c]">Durable Asset Register & Serial Tracking</h2>
+                        <p class="text-xs text-gray-500">Each asset tracked by unique serial tag across department custody</p>
                     </div>
                     <div class="flex items-center gap-2 self-start md:self-auto">
                         <button id="btn-open-asset-modal" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow transition">
@@ -650,7 +652,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t text-xs">
-                    <input type="text" id="filter-assets-search" placeholder="🔍 Search asset, custodian, tag..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
+                    <input type="text" id="filter-assets-search" placeholder="🔍 Search serial tag, asset, or holder..." class="p-2 border rounded-lg outline-none bg-gray-50 focus:bg-white">
                     <select id="filter-assets-status" class="p-2 border rounded-lg outline-none bg-gray-50 font-semibold text-[#0b3b2c]">
                         <option value="ALL">All Custody Statuses</option>
                         <option value="In Store">✓ In Store (Present)</option>
@@ -674,12 +676,12 @@
                     <table class="w-full text-left text-xs">
                         <thead class="bg-emerald-50 text-[#0b3b2c] uppercase border-b border-emerald-100">
                             <tr>
-                                <th class="p-2.5">Asset Name</th>
+                                <th class="p-2.5 font-bold text-[#0b3b2c]">Unique Tag / Serial</th>
+                                <th class="p-2.5">Asset Description</th>
                                 <th class="p-2.5">Department</th>
                                 <th class="p-2.5">Presence / Custody</th>
-                                <th class="p-2.5">Custodian</th>
+                                <th class="p-2.5">Current Holder</th>
                                 <th class="p-2.5">Condition</th>
-                                <th class="p-2.5">Serial / Tag</th>
                                 <th class="p-2.5">Penalty / Waiver</th>
                                 <th class="p-2.5 text-right">Actions</th>
                             </tr>
@@ -922,8 +924,8 @@
             <form id="form-issue-asset" class="space-y-3 text-xs">
                 <input type="hidden" id="issue_asset_id">
                 <div>
-                    <label class="block font-semibold mb-1">Asset Name</label>
-                    <input type="text" id="issue_asset_name" disabled class="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-600">
+                    <label class="block font-semibold mb-1">Asset Serial / Tag Number</label>
+                    <input type="text" id="issue_asset_name" disabled class="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-700 font-mono font-bold">
                 </div>
                 <div>
                     <label class="block font-semibold mb-1">Person Receiving (Custodian)</label>
@@ -949,8 +951,8 @@
             <form id="form-return-asset" class="space-y-3 text-xs">
                 <input type="hidden" id="return_asset_id">
                 <div>
-                    <label class="block font-semibold mb-1">Asset Name</label>
-                    <input type="text" id="return_asset_name" disabled class="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-600">
+                    <label class="block font-semibold mb-1">Asset Serial & Custodian</label>
+                    <input type="text" id="return_asset_name" disabled class="w-full p-2 border rounded-lg text-sm bg-gray-100 text-gray-700 font-mono">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
@@ -1087,20 +1089,27 @@
         </div>
     </div>
 
-    <!-- New Asset Modal -->
+    <!-- New Asset Modal (With Guaranteed Unique Serial/Tag Verification) -->
     <div id="modal-new-asset" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 class="text-base font-bold text-[#0b3b2c] mb-1">Record Durable Asset</h3>
-            <p class="text-xs text-gray-500 mb-4">Track durable items like laptops, machines, or furniture</p>
+            <p class="text-xs text-gray-500 mb-4">Track durable items like laptops, machines, or furniture by unique serial</p>
             <form id="form-create-asset" class="space-y-3 text-xs">
                 <div>
                     <label class="block font-semibold mb-1">Asset Description</label>
-                    <input type="text" id="asset_name" required placeholder="e.g. HP Laptop ProBook" class="w-full p-2 border rounded-lg text-sm outline-none">
+                    <input type="text" id="asset_name" required placeholder="e.g. HP Laptop ProBook, Shaving Machine" class="w-full p-2 border rounded-lg text-sm outline-none">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block font-semibold">Unique Serial / Tag Number</label>
+                        <span class="text-[10px] text-gray-400">Leave empty to auto-generate (AST-XXXX)</span>
+                    </div>
+                    <input type="text" id="asset_tag" placeholder="e.g. SN-883921 or MSCP-ED-01" class="w-full p-2 border rounded-lg text-sm font-mono font-bold outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block font-semibold mb-1">Owning Department</label>
-                        <select id="asset_dept_id" required class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none"></select>
+                        <select id="asset_dept_id" class="w-full p-2 border rounded-lg text-sm bg-gray-50 outline-none"></select>
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Acquisition Type</label>
@@ -1122,22 +1131,18 @@
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Estimated Cost / Value</label>
-                        <input type="number" id="asset_cost" step="0.01" placeholder="KES" class="w-full p-2 border rounded-lg text-sm outline-none">
+                        <input type="number" id="asset_cost" step="0.01" placeholder="KES" class="w-full p-2 border rounded-lg text-sm outline-none font-mono">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold mb-1">Storage Location in Store</label>
+                        <label class="block font-semibold mb-1">Storage Location in Department</label>
                         <input type="text" id="asset_location" required placeholder="e.g. Store Room / IT Desk" class="w-full p-2 border rounded-lg text-sm outline-none">
                     </div>
                     <div>
-                        <label class="block font-semibold mb-1">Responsible Officer</label>
-                        <input type="text" id="asset_custodian" required placeholder="Staff name" class="w-full p-2 border rounded-lg text-sm outline-none">
+                        <label class="block font-semibold mb-1">Responsible Officer / Custodian</label>
+                        <input type="text" id="asset_custodian" required placeholder="Staff or custodian name" class="w-full p-2 border rounded-lg text-sm outline-none">
                     </div>
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1">Serial / Tag Number</label>
-                    <input type="text" id="asset_tag" placeholder="e.g. SN-883921" class="w-full p-2 border rounded-lg text-sm outline-none">
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t">
                     <button type="button" id="btn-cancel-asset-modal" class="px-3 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>

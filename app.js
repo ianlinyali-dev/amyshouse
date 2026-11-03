@@ -157,7 +157,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         safeClick('btn-open-new-item-modal', () => showModal('modal-new-item'));
         safeClick('btn-open-new-donor-modal', () => openDonorEditor());
         safeClick('btn-open-add-donor', () => openDonorEditor());
-        safeClick('btn-open-asset-modal', () => showModal('modal-new-asset'));
+        safeClick('btn-open-asset-modal', () => {
+            // Ensure department is preselected for department officers
+            if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+                const myDept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
+                if (myDept) document.getElementById('asset_dept_id').value = myDept.id;
+            }
+            showModal('modal-new-asset');
+        });
         safeClick('btn-open-new-staff-modal', () => showModal('modal-new-staff'));
         safeClick('btn-open-request-modal', () => showModal('modal-raise-request'));
         safeClick('btn-edit-my-profile', () => {
@@ -245,7 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 3. ACTION CENTRE ALERTS (AUTO-REMOVAL ON FULFILLMENT)
+    // 3. ACTION CENTRE ALERTS
     // --------------------------------------------------------------------------
     async function loadActionCentre() {
         const panel = document.getElementById('action-centre-panel');
@@ -274,7 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ${reqCount > 0 ? `<span class="bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full">🔔 ${reqCount} Requisition${reqCount > 1 ? 's' : ''}</span>` : ''}
             ${expiredCount > 0 ? `<span class="bg-red-600 text-white font-bold px-2 py-0.5 rounded-full">🔴 ${expiredCount} Expired</span>` : ''}
             ${soonCount > 0 ? `<span class="bg-amber-100 text-amber-900 border border-amber-300 font-semibold px-2 py-0.5 rounded-full">🟡 ${soonCount} Expiring Soon</span>` : ''}
-            ${lowCount > 0 ? `<span class="bg-orange-100 text-orange-900 border border-orange-300 font-semibold px-2 py-0.5 rounded-full">🟠 ${lowCount} Low Stock</span>` : ''}
+            ${lowCount > 0 ? `<span class="bg-orange-100 text-orange-900 border border-orange-300 font-semibold px-2 py-0.5 rounded-full">🟠 ${lowCount} Low / Out</span>` : ''}
         `;
 
         renderActionCentreDrawer('ALL');
@@ -407,7 +414,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
         const storeDeptId = storeDept ? storeDept.id : '';
 
-        // Actual storage departments (Excludes supervisory AD001, includes AH001)
+        // Actual storage locations (Excludes supervisory AD001, includes AH001)
         const actualStorageDepts = cachedDepts.filter(d => d.dept_code !== 'AD001');
 
         const recipientDeptOptions = '<option value="">Select Destination Department...</option>' + 
@@ -417,13 +424,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         transferDestSelect.innerHTML = recipientDeptOptions;
         if (batchDestSelect) batchDestSelect.innerHTML = recipientDeptOptions;
 
+        // Populate asset department options
+        assetDeptSelect.innerHTML = actualStorageDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+
         if (currentUserDeptCode === 'AD001' || currentUserDeptCode === 'ST001') {
             deptSelect.innerHTML = `<option value="${storeDeptId}">Central Store (Main Warehouse)</option>` + 
                 actualStorageDepts.filter(d => d.dept_code !== 'ST001')
                                   .map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
             deptSelect.disabled = false;
-
-            assetDeptSelect.innerHTML = actualStorageDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
             assetDeptSelect.disabled = false;
 
             const filterOptions = '<option value="ALL">All Storage Locations</option>' + 
@@ -438,7 +446,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 deptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
                 deptSelect.disabled = true;
 
-                assetDeptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
+                // Department users are locked to their own department in asset creation
+                assetDeptSelect.value = myDept.id;
                 assetDeptSelect.disabled = true;
 
                 filterStockDept.innerHTML = `<option value="${myDept.dept_code}">${myDept.name}</option>`;
@@ -811,7 +820,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 9. REQUISITION & REQUESTS PIPELINE (FIXED CHECK CONSTRAINT HANDLING)
+    // 9. REQUISITION PIPELINE (ALIGNED WITH 'TOP-UP' AND TRANSFER TYPES)
     // --------------------------------------------------------------------------
     document.getElementById('form-raise-request').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -923,7 +932,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
-    // Fulfill Requisition: Fixed to match constraint and auto-remove alert
+    // Fulfill Requisition: Explicitly aligns with Top-up type so filtering works perfectly
     window.fulfillRequisition = async (reqId) => {
         const req = cachedRequests.find(r => r.id === reqId);
         if (!req) return;
@@ -944,18 +953,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // ALIGNMENT: If urgency was Top-up, record movement as 'Top-up' so it matches ledger filters
+        const assignedMovementType = (req.urgency === 'Top-up') ? 'Top-up' : 'Transfer to Department';
         const movementsToInsert = [];
 
         for (const it of req.stock_request_items) {
             movementsToInsert.push({
                 item_id: it.item_id,
                 department_id: storeDeptId,
-                movement_type: 'Transfer to Department',
+                movement_type: assignedMovementType,
                 direction: 'Out',
                 quantity: it.quantity_requested,
                 recipient_name: req.requested_by_name,
                 transfer_to_dept_id: req.requesting_dept_id,
-                reason: `Requisition fulfillment (${req.request_code}) issued to ${req.departments?.name}`,
+                reason: `Requisition fulfillment (${req.request_code}) [${req.urgency}] to ${req.departments?.name}`,
                 performed_by_name: currentUserName,
                 performed_by_email: currentUserEmail,
                 performed_by_dept: currentUserDeptCode
@@ -964,25 +975,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             movementsToInsert.push({
                 item_id: it.item_id,
                 department_id: req.requesting_dept_id,
-                movement_type: 'Transfer to Department',
+                movement_type: assignedMovementType,
                 direction: 'In',
                 quantity: it.quantity_requested,
                 recipient_name: req.requested_by_name,
-                reason: `Requisition receipt (${req.request_code}) from Central Store`,
+                reason: `Requisition receipt (${req.request_code}) [${req.urgency}] from Central Store`,
                 performed_by_name: currentUserName,
                 performed_by_email: currentUserEmail,
                 performed_by_dept: currentUserDeptCode
             });
         }
 
-        // Insert movements
         const { error: moveErr } = await supabase.from('stock_movements').insert(movementsToInsert);
         if (moveErr) {
             alert('Error generating fulfillment movements: ' + moveErr.message);
             return;
         }
 
-        // Mark requisition as Fulfilled (Clears alert automatically from Action Centre)
+        // Mark as Fulfilled: Action Centre alert removes itself immediately
         await supabase.from('stock_requests').update({ status: 'Fulfilled' }).eq('id', reqId);
 
         alert(`Requisition ${req.request_code} fulfilled successfully! Action Centre alert cleared.`);
@@ -999,13 +1009,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --------------------------------------------------------------------------
-    // 10. ASSET REGISTER (DEPARTMENT OPERATORS CAN ISSUE & RETURN THEIR ASSETS)
+    // 10. ASSET REGISTER (TRACKED BY UNIQUE SERIAL / TAG NUMBER)
     // --------------------------------------------------------------------------
     async function loadAssets() {
         const tbody = document.getElementById('assets-table-body');
         let query = supabase.from('assets').select('*, departments(name, dept_code)').order('created_at', { ascending: false });
 
-        // Scoped for department officers
         if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             const dept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
             if (dept) query = query.eq('department_id', dept.id);
@@ -1013,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { data, error } = await query;
         if (error) {
-            tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500">Error loading assets: ${error.message}</td></tr>`;
             return;
         }
 
@@ -1043,10 +1052,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const filtered = cachedAssets.filter(a => {
             const matchesSearch = !search || 
-                a.item_name.toLowerCase().includes(search) || 
+                (a.tag_or_serial && a.tag_or_serial.toLowerCase().includes(search)) ||
+                (a.item_name && a.item_name.toLowerCase().includes(search)) || 
                 (a.custodian && a.custodian.toLowerCase().includes(search)) ||
-                (a.issued_to && a.issued_to.toLowerCase().includes(search)) ||
-                (a.tag_or_serial && a.tag_or_serial.toLowerCase().includes(search));
+                (a.issued_to && a.issued_to.toLowerCase().includes(search));
 
             const matchesStatus = status === 'ALL' || a.status === status;
             const matchesDept = dept === 'ALL' || a.departments?.dept_code === dept;
@@ -1068,7 +1077,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             return `
                 <tr class="hover:bg-gray-50 border-b">
-                    <td class="p-2.5 font-bold text-[#0b3b2c]">${a.item_name}</td>
+                    <td class="p-2.5 font-mono font-bold text-[#0b3b2c]">${a.tag_or_serial || '—'}</td>
+                    <td class="p-2.5 font-bold text-gray-900">${a.item_name}</td>
                     <td class="p-2.5 text-xs text-gray-600">${a.departments?.name || 'Central'}</td>
                     <td class="p-2.5">
                         <span class="px-2 py-0.5 rounded text-xs font-semibold ${
@@ -1082,7 +1092,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ${isIssued ? `<strong class="text-amber-900">${a.issued_to}</strong> <span class="text-gray-400 block text-[10px]">Since ${a.issued_date || ''}</span>` : a.custodian}
                     </td>
                     <td class="p-2.5"><span class="px-2 py-0.5 rounded text-xs bg-gray-100">${a.condition}</span></td>
-                    <td class="p-2.5 text-xs font-mono text-gray-500">${a.tag_or_serial || '—'}</td>
                     <td class="p-2.5 text-xs">
                         ${a.penalty_status !== 'None' ? `
                             <span class="text-red-700 font-bold">${a.penalty_status}</span>: KES ${a.penalty_amount || 0}
@@ -1102,13 +1111,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
-    // Departments can issue their own assets
+    // Modal Opening Handlers
     window.openIssueModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
 
         document.getElementById('issue_asset_id').value = asset.id;
-        document.getElementById('issue_asset_name').value = `${asset.item_name} [${asset.tag_or_serial || 'No Tag'}]`;
+        document.getElementById('issue_asset_name').value = `[${asset.tag_or_serial}] ${asset.item_name}`;
         document.getElementById('issue_date').value = new Date().toISOString().slice(0, 10);
         showModal('modal-issue-asset');
     };
@@ -1132,13 +1141,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Departments can process returns of their own assets
     window.openReturnModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
 
         document.getElementById('return_asset_id').value = asset.id;
-        document.getElementById('return_asset_name').value = `${asset.item_name} (Held by ${asset.issued_to || 'Staff'})`;
+        document.getElementById('return_asset_name').value = `[${asset.tag_or_serial}] ${asset.item_name} (Held by ${asset.issued_to || 'Staff'})`;
         document.getElementById('return_date').value = new Date().toISOString().slice(0, 10);
         document.getElementById('penalty-waiver-block').style.display = 'none';
         showModal('modal-return-asset');
@@ -1175,13 +1183,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Admin-Only Safeguarded Waiver
     window.openWaiverModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
 
         document.getElementById('waiver_asset_id').value = asset.id;
-        document.getElementById('waiver_asset_name').value = `${asset.item_name} [${asset.tag_or_serial || 'No Tag'}]`;
+        document.getElementById('waiver_asset_name').value = `[${asset.tag_or_serial}] ${asset.item_name}`;
         document.getElementById('waiver_penalty_amount').value = asset.penalty_amount || 0;
         document.getElementById('waiver_admin_password').value = '';
         document.getElementById('waiver_reason').value = '';
@@ -1225,7 +1232,62 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 11. ITEM MASTER & QUICK PRICE EDITOR
+    // 11. ROBUST ASSET CREATION (WORKS FOR ALL DEPARTMENTS WITH UNIQUE TAG)
+    // --------------------------------------------------------------------------
+    document.getElementById('form-create-asset').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // Resolve Department ID reliably for both department officers and Admin
+        let targetDeptId = null;
+        if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
+            targetDeptId = cachedDepts.find(d => d.dept_code === currentUserDeptCode)?.id;
+        } else {
+            targetDeptId = toValidUUID(document.getElementById('asset_dept_id').value);
+        }
+
+        if (!targetDeptId) {
+            alert('Please select a department for this asset.');
+            return;
+        }
+
+        const serialTag = document.getElementById('asset_tag').value.trim();
+
+        // Check uniqueness locally if tag is entered
+        if (serialTag) {
+            const exists = cachedAssets.some(a => (a.tag_or_serial || '').toLowerCase() === serialTag.toLowerCase());
+            if (exists) {
+                alert(`Serial / Tag "${serialTag}" is already assigned to another asset! Serial tags must be unique.`);
+                return;
+            }
+        }
+
+        const payload = {
+            item_name: document.getElementById('asset_name').value.trim(),
+            department_id: targetDeptId,
+            acquisition_type: document.getElementById('asset_acq_type').value,
+            condition: document.getElementById('asset_condition').value,
+            cost_or_value: parseFloat(document.getElementById('asset_cost').value) || 0,
+            storage_location: document.getElementById('asset_location').value.trim(),
+            custodian: document.getElementById('asset_custodian').value.trim(),
+            tag_or_serial: serialTag || null,
+            status: 'In Store',
+            performed_by_name: currentUserName,
+            performed_by_email: currentUserEmail
+        };
+
+        const { data: newAsset, error } = await supabase.from('assets').insert([payload]).select().single();
+        if (error) {
+            alert('Error saving asset: ' + error.message);
+        } else {
+            alert(`Asset successfully recorded with tracking code: ${newAsset.tag_or_serial}`);
+            document.getElementById('form-create-asset').reset();
+            hideModal('modal-new-asset');
+            await loadAssets();
+        }
+    });
+
+    // --------------------------------------------------------------------------
+    // 12. ITEM MASTER & QUICK PRICE EDITOR
     // --------------------------------------------------------------------------
     window.openQuickEditItem = (itemId) => {
         const item = cachedItems.find(i => i.id === itemId);
@@ -1297,14 +1359,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 12. DONORS DIRECTORY & EDITING (FIXED FIELD MAPPING & RLS)
+    // 13. DONORS DIRECTORY & EDITING
     // --------------------------------------------------------------------------
     function openDonorEditor(donorId = null) {
         document.getElementById('form-donor-editor').reset();
         document.getElementById('edit_donor_id').value = donorId || '';
 
         if (donorId) {
-            // Check both donor_id and id to handle summary view mapping
             const d = cachedDonors.find(donor => (donor.donor_id === donorId || donor.id === donorId));
             if (d) {
                 document.getElementById('donor_full_name').value = d.donor_name || d.name || '';
@@ -1419,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('sort-donor-activity').addEventListener('change', renderDonorsTable);
 
     // --------------------------------------------------------------------------
-    // 13. REPLENISHMENT LIST (UNIVERSAL)
+    // 14. REPLENISHMENT LIST (UNIVERSAL)
     // --------------------------------------------------------------------------
     async function loadReplenishmentList() {
         const tbody = document.getElementById('replenishment-table-body');
@@ -1465,7 +1526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 14. CENTRAL BALANCES & ORGANIZATION INVENTORY VIEW
+    // 15. CENTRAL BALANCES (WITH DETAILED OUT-OF-STOCK BADGES & RESTOCK ACTION)
     // --------------------------------------------------------------------------
     async function loadStockBalances() {
         const tbody = document.getElementById('balances-table-body');
@@ -1515,49 +1576,76 @@ document.addEventListener('DOMContentLoaded', async () => {
             const matchesSearch = !search || r.item_name.toLowerCase().includes(search);
             const matchesDept = dept === 'ALL' || r.dept_code === dept;
             const matchesCat = cat === 'ALL' || r.category === cat;
-            const isLow = r.balance <= r.reorder_level;
-            const matchesHealth = health === 'ALL' || (health === 'LOW' ? isLow : !isLow);
+            
+            const bal = Number(r.balance);
+            const isZero = bal <= 0;
+            const isLow = bal <= r.reorder_level && bal > 0;
+            const isHealthy = bal > r.reorder_level;
+
+            let matchesHealth = true;
+            if (health === 'IN_STOCK') matchesHealth = bal > 0;
+            else if (health === 'LOW') matchesHealth = bal <= r.reorder_level;
+            else if (health === 'OUT_OF_STOCK') matchesHealth = isZero;
+            else if (health === 'HEALTHY') matchesHealth = isHealthy;
 
             return matchesSearch && matchesDept && matchesCat && matchesHealth;
         });
 
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-gray-400">No stock commodities match criteria.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400">No stock commodities match criteria.</td></tr>';
             return;
         }
 
         const isAdmin = currentUserDeptCode === 'AD001';
 
         tbody.innerHTML = filtered.map(r => {
-            const isLow = r.balance <= r.reorder_level;
+            const bal = Number(r.balance);
+            const isZero = bal <= 0;
+            const isLow = bal <= r.reorder_level && bal > 0;
             const unitPrice = Number(r.standard_cost || 0);
-            const totalValuation = Number(r.balance * unitPrice);
+            const totalValuation = Number(bal * unitPrice);
 
             return `
                 <tr class="hover:bg-gray-50 border-b">
                     <td class="p-3 font-semibold text-gray-900">${r.item_name}</td>
                     <td class="p-3 text-xs text-gray-500">${r.category}</td>
                     <td class="p-3 text-xs font-medium text-[#0b3b2c]">${r.department_name}</td>
-                    <td class="p-3 font-mono font-bold text-sm ${isLow ? 'text-red-600' : 'text-[#0b3b2c]'}">
-                        ${Number(r.balance).toFixed(2)} <span class="text-xs font-normal text-gray-500">${r.unit}</span>
+                    <td class="p-3 font-mono font-bold text-sm ${isZero ? 'text-red-700' : isLow ? 'text-orange-600' : 'text-[#0b3b2c]'}">
+                        ${bal.toFixed(2)} <span class="text-xs font-normal text-gray-500">${r.unit}</span>
                     </td>
                     <td class="p-3 font-mono text-xs text-gray-700">KES ${unitPrice.toFixed(2)}</td>
                     <td class="p-3 font-mono text-xs font-bold text-gray-800">KES ${totalValuation.toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
                     <td class="p-3">
-                        <span class="px-2 py-0.5 rounded text-xs font-semibold ${isLow ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
-                            ${isLow ? '⚠️ Low Stock' : '✓ Healthy'}
+                        <span class="px-2 py-0.5 rounded text-xs font-semibold ${
+                            isZero ? 'bg-red-200 text-red-950 font-black' :
+                            isLow ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
+                        }">
+                            ${isZero ? '🔴 Out of Stock (0)' : isLow ? '⚠️ Low Stock' : '✓ Healthy'}
                         </span>
                     </td>
-                    <td class="p-3 text-right">
-                        ${isAdmin ? `<button onclick="window.openQuickEditItem('${r.item_id}')" class="text-xs bg-gray-100 hover:bg-emerald-100 text-[#0b3b2c] font-bold px-2 py-1 rounded transition">✏️ Edit</button>` : '<span class="text-gray-400 text-xs">—</span>'}
+                    <td class="p-3 text-right space-x-1">
+                        ${isAdmin ? `<button onclick="window.openQuickEditItem('${r.item_id}')" class="text-xs bg-gray-100 hover:bg-emerald-100 text-[#0b3b2c] font-bold px-2 py-1 rounded transition">✏️ Edit</button>` : ''}
+                        ${isZero && (isAdmin || currentUserDeptCode === 'ST001') ? `<button onclick="window.quickRestockItem('${r.item_id}')" class="text-xs bg-[#0b3b2c] hover:bg-[#07281c] text-white px-2 py-1 rounded">➕ Restock</button>` : ''}
                     </td>
                 </tr>
             `;
         }).join('');
     }
 
+    window.quickRestockItem = (itemId) => {
+        document.querySelector('[data-tab="tab-move"]').click();
+        document.getElementById('movement_type').value = 'Purchase';
+        document.getElementById('movement_type').dispatchEvent(new Event('change'));
+
+        const item = cachedItems.find(i => i.id === itemId);
+        if (item) {
+            document.getElementById('item_search_input').value = `${item.name} (${item.unit})`;
+            document.getElementById('item_id').value = item.id;
+        }
+    };
+
     // --------------------------------------------------------------------------
-    // 15. MOVEMENT LEDGER
+    // 16. MOVEMENT LEDGER (FILTERS ALIGNED WITH REQUISITION TOP-UPS)
     // --------------------------------------------------------------------------
     async function loadLedgerRecords() {
         const tbody = document.getElementById('ledger-table-body');
@@ -1597,7 +1685,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 (m.recipient_name && m.recipient_name.toLowerCase().includes(search)) ||
                 (m.reason && m.reason.toLowerCase().includes(search));
 
-            const matchesType = moveType === 'ALL' || m.movement_type === moveType;
+            let matchesType = true;
+            if (moveType === 'Top-up') {
+                // Catches explicit Top-ups as well as fulfilled top-up requisitions
+                matchesType = m.movement_type === 'Top-up' || 
+                              (m.reason && m.reason.toLowerCase().includes('top-up')) ||
+                              m.reason_category === 'Top-up';
+            } else if (moveType !== 'ALL') {
+                matchesType = m.movement_type === moveType;
+            }
+
             const matchesDept = dept === 'ALL' || m.departments?.dept_code === dept;
             const matchesDate = !dateVal || m.created_at.startsWith(dateVal);
 
@@ -1605,7 +1702,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-gray-400">No ledger records match filters.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400">No ledger records match filters.</td></tr>';
             return;
         }
 
@@ -1800,7 +1897,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 16. FILTERS & REFRESH
+    // 17. FILTERS & REFRESH
     // --------------------------------------------------------------------------
     function setupFilters() {
         ['filter-stock-search', 'filter-stock-category', 'filter-stock-dept', 'filter-stock-health'].forEach(id => {
@@ -1839,7 +1936,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 17. CSV EXPORTS
+    // 18. CSV EXPORTS
     // --------------------------------------------------------------------------
     function downloadCSV(csvContent, fileName) {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1916,15 +2013,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data } = await supabase.from('assets').select('*, departments(name)');
         if (!data || !data.length) return alert('No assets to export.');
 
-        let csv = 'Asset Name,Department,Status,Custodian,Issued To,Issued Date,Return Condition,Penalty Status,Penalty Amount (KES),Serial Tag,Waived By,Waiver Notes\n';
+        let csv = 'Serial Tag,Asset Name,Department,Status,Custodian,Issued To,Issued Date,Return Condition,Penalty Status,Penalty Amount (KES),Waived By,Waiver Notes\n';
         data.forEach(a => {
-            csv += `"${a.item_name}","${a.departments?.name}","${a.status}","${a.custodian}","${a.issued_to || ''}","${a.issued_date || ''}","${a.return_condition || ''}","${a.penalty_status}","${a.penalty_amount}","${a.tag_or_serial || ''}","${a.waived_by_name || ''}","${a.waiver_notes || ''}"\n`;
+            csv += `"${a.tag_or_serial || ''}","${a.item_name}","${a.departments?.name}","${a.status}","${a.custodian}","${a.issued_to || ''}","${a.issued_date || ''}","${a.return_condition || ''}","${a.penalty_status}","${a.penalty_amount}","${a.waived_by_name || ''}","${a.waiver_notes || ''}"\n`;
         });
         downloadCSV(csv, `Amys_House_Assets_${new Date().toISOString().slice(0,10)}.csv`);
     });
 
     // --------------------------------------------------------------------------
-    // 18. NETWORK STATUS MONITOR
+    // 19. NETWORK STATUS MONITOR
     // --------------------------------------------------------------------------
     const syncStatus = document.getElementById('sync-status');
     window.addEventListener('online', () => {

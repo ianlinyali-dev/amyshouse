@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Strict UUID Validation Function to prevent PostgreSQL 22P02 "undefined" errors
     function toValidUUID(val) {
         if (!val || typeof val !== 'string') return null;
         const trimmed = val.trim();
@@ -123,14 +122,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isStorekeeper = currentUserDeptCode === 'ST001';
 
         const roleTitle = isAdmin 
-            ? 'Executive Admin (Oversight & Management)' 
+            ? 'Executive Admin (Dorothy - Supervisory Oversight)' 
             : isStorekeeper 
-            ? 'Central Storekeeper (Main Warehouse)' 
+            ? 'Central Storekeeper (Edward - Main Physical Warehouse)' 
+            : currentUserDeptCode === 'AH001'
+            ? 'Amy\'s House Officer (Dotty - Residential Department)'
             : `Department Operator [${currentUserDeptCode}]`;
 
         document.getElementById('user-display-role').textContent = `${currentUserName} · ${roleTitle}`;
 
-        // STRICT ACCESS PRIVILEGES
         if (isAdmin) {
             document.getElementById('nav-btn-accounts').style.display = 'flex';
             document.getElementById('nav-btn-donations').style.display = 'flex';
@@ -173,7 +173,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         safeClick('btn-cancel-staff-modal', () => hideModal('modal-new-staff'));
         safeClick('btn-cancel-edit-staff-modal', () => hideModal('modal-edit-staff'));
 
-        // Toggle Single vs Multi-Item Batch Issuance
         safeClick('btn-toggle-multi-item', () => {
             const singleForm = document.getElementById('movement-form');
             const batchSection = document.getElementById('multi-item-batch-section');
@@ -221,6 +220,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ? '<span>▲ Collapse</span>' 
                 : '<span>▼ Review Items</span>';
         });
+
+        safeClick('btn-redirect-purchase', () => {
+            hideModal('modal-stock-blocked');
+            document.querySelector('[data-tab="tab-move"]').click();
+            document.getElementById('movement_type').value = 'Purchase';
+            document.getElementById('movement_type').dispatchEvent(new Event('change'));
+        });
     }
 
     function safeClick(id, fn) {
@@ -239,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 3. ACTION CENTRE ALERTS (REQUISITIONS, LOW STOCK & EXPIRY)
+    // 3. ACTION CENTRE ALERTS
     // --------------------------------------------------------------------------
     async function loadActionCentre() {
         const panel = document.getElementById('action-centre-panel');
@@ -366,7 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 5. MASTER DATA & SEARCHABLE DROPDOWNS
+    // 5. MASTER DATA LOADER (AH001 INCLUDED, AD001 EXCLUDED FROM STOREROOMS)
     // --------------------------------------------------------------------------
     async function loadMasterMetadata() {
         try {
@@ -401,27 +407,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
         const storeDeptId = storeDept ? storeDept.id : '';
 
+        // Real storage departments: Excludes supervisory AD001, includes AH001 (Amy's House)
+        const actualStorageDepts = cachedDepts.filter(d => d.dept_code !== 'AD001');
+
+        // Recipient departments for transfers (all departments except Central Store and AD001)
         const recipientDeptOptions = '<option value="">Select Destination Department...</option>' + 
-            cachedDepts.filter(d => d.dept_code !== 'ST001').map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+            actualStorageDepts.filter(d => d.dept_code !== 'ST001')
+                              .map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
 
         transferDestSelect.innerHTML = recipientDeptOptions;
         if (batchDestSelect) batchDestSelect.innerHTML = recipientDeptOptions;
 
         if (currentUserDeptCode === 'AD001' || currentUserDeptCode === 'ST001') {
+            // Admin Dorothy & Storekeeper Edward oversee Central Store by default
             deptSelect.innerHTML = `<option value="${storeDeptId}">Central Store (Main Warehouse)</option>` + 
-                cachedDepts.filter(d => d.dept_code !== 'ST001').map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+                actualStorageDepts.filter(d => d.dept_code !== 'ST001')
+                                  .map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
             deptSelect.disabled = false;
 
-            assetDeptSelect.innerHTML = cachedDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
+            assetDeptSelect.innerHTML = actualStorageDepts.map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
             assetDeptSelect.disabled = false;
 
-            const filterOptions = '<option value="ALL">All Departments</option>' + 
-                cachedDepts.map(d => `<option value="${d.dept_code}">${d.name}</option>`).join('');
+            const filterOptions = '<option value="ALL">All Storage Locations</option>' + 
+                actualStorageDepts.map(d => `<option value="${d.dept_code}">${d.name}</option>`).join('');
 
             filterStockDept.innerHTML = filterOptions;
             filterLedgerDept.innerHTML = filterOptions;
             filterAssetsDept.innerHTML = filterOptions;
         } else {
+            // Department Operators (e.g. Dotty for AH001, Paul for FC001)
             const myDept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
             if (myDept) {
                 deptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
@@ -489,7 +503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 6. AUTO DONATION REF GENERATION
+    // 6. AUTO DONATION REF GENERATION (AH/DR/... FOR AMY'S HOUSE)
     // --------------------------------------------------------------------------
     async function checkAndGenerateDonationRef() {
         const moveType = document.getElementById('movement_type').value;
@@ -504,6 +518,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             else if (dept.dept_code === 'ES001') prefix = 'ES';
             else if (dept.dept_code === 'EE001') prefix = 'EE';
             else if (dept.dept_code === 'FN001') prefix = 'FN';
+            else if (dept.dept_code === 'AH001' || dept.dept_code === 'ST001') prefix = 'AH';
         }
 
         const { data: refNum, error } = await supabase.rpc('get_next_donation_ref', { dept_prefix: prefix });
@@ -534,7 +549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 7. RECORD SINGLE STOCK MOVEMENT
+    // 7. RECORD SINGLE STOCK MOVEMENT (STRICT NO-NEGATIVE BLOCK)
     // --------------------------------------------------------------------------
     document.getElementById('movement-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -572,19 +587,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         const reasonText = document.getElementById('reason').value.trim();
         const recipientName = document.getElementById('recipient_name').value.trim();
 
+        // STRICT NO-NEGATIVE STOCK CHECK: NO BYPASS ALLOWED
         if (direction === 'Out') {
             const { data: balanceCheck } = await supabase
                 .from('current_stock_balances')
-                .select('balance')
+                .select('balance, item_name, unit, department_name')
                 .eq('item_id', itemId)
                 .eq('department_id', deptId)
                 .maybeSingle();
 
-            const currentAvailable = balanceCheck ? balanceCheck.balance : 0;
+            const currentAvailable = balanceCheck ? Number(balanceCheck.balance) : 0;
+            const itemUnit = balanceCheck ? balanceCheck.unit : '';
+            const itemName = balanceCheck ? balanceCheck.item_name : 'Item';
+            const deptName = balanceCheck ? balanceCheck.department_name : 'Storeroom';
+
             if (quantity > currentAvailable) {
-                if (!confirm(`Warning: Only ${currentAvailable} in stock for this department. Record anyway as an authorized adjustment?`)) {
-                    return;
-                }
+                const deficit = (quantity - currentAvailable).toFixed(2);
+                document.getElementById('blocked-stock-details').innerHTML = `
+                    <div><strong>Commodity:</strong> ${itemName}</div>
+                    <div><strong>Requested:</strong> ${quantity} ${itemUnit}</div>
+                    <div><strong>Available in ${deptName}:</strong> ${currentAvailable} ${itemUnit}</div>
+                    <div class="text-red-700 font-bold">Deficit: -${deficit} ${itemUnit}</div>
+                `;
+                showModal('modal-stock-blocked');
+                return; // HARD STOP: Prevents form submission
             }
         }
 
@@ -683,12 +709,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (matched) {
                 tr.dataset.itemId = matched.id;
                 const balanceRec = cachedBalances.find(b => b.item_id === matched.id && b.dept_code === 'ST001');
-                const qty = balanceRec ? balanceRec.balance : 0;
+                const qty = balanceRec ? Number(balanceRec.balance) : 0;
                 availCell.textContent = `${qty} ${matched.unit}`;
+                availCell.dataset.avail = qty;
                 if (qty <= 0) availCell.classList.add('text-red-600');
             } else {
                 tr.dataset.itemId = '';
                 availCell.textContent = '—';
+                availCell.dataset.avail = 0;
             }
         });
 
@@ -720,9 +748,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         for (const row of rows) {
             const itemId = toValidUUID(row.dataset.itemId);
             const qty = parseFloat(row.querySelector('.batch-item-qty').value);
+            const avail = parseFloat(row.querySelector('.batch-item-avail').dataset.avail || 0);
 
             if (!itemId || isNaN(qty) || qty <= 0) {
                 alert('Please ensure all commodity rows have a valid item and quantity selected.');
+                return;
+            }
+
+            if (qty > avail) {
+                alert(`Cannot issue ${qty} units. Only ${avail} available in Central Store for one of the selected items. Please restock first.`);
                 return;
             }
 
@@ -790,7 +824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             reqDeptId = cachedDepts.find(d => d.dept_code === currentUserDeptCode)?.id;
         } else {
-            reqDeptId = cachedDepts.find(d => d.dept_code === 'FC001')?.id;
+            reqDeptId = cachedDepts.find(d => d.dept_code === 'AH001')?.id;
         }
 
         if (!reqDeptId) return alert('Department could not be identified.');
@@ -897,12 +931,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         const req = cachedRequests.find(r => r.id === reqId);
         if (!req) return;
 
-        if (!confirm(`Fulfill requisition ${req.request_code} for ${req.departments?.name}? This will automatically deduct Central Store stock and issue items to the department.`)) {
+        const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
+        const storeDeptId = storeDept ? storeDept.id : '';
+
+        for (const it of req.stock_request_items) {
+            const balanceRec = cachedBalances.find(b => b.item_id === it.item_id && b.dept_code === 'ST001');
+            const available = balanceRec ? Number(balanceRec.balance) : 0;
+            if (it.quantity_requested > available) {
+                alert(`Cannot fulfill requisition: Insufficient stock for ${it.items?.name}. Requested: ${it.quantity_requested}, Available in Central Store: ${available}. Please restock first.`);
+                return;
+            }
+        }
+
+        if (!confirm(`Fulfill requisition ${req.request_code} for ${req.departments?.name}? This will deduct Central Store stock and issue items to the department.`)) {
             return;
         }
 
-        const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
-        const storeDeptId = storeDept ? storeDept.id : '';
         const movementsToInsert = [];
 
         for (const it of req.stock_request_items) {
@@ -952,7 +996,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --------------------------------------------------------------------------
-    // 10. ASSET REGISTER (SAFEGUARDED ADMIN WAIVER AUTHORIZATION)
+    // 10. ASSET REGISTER (SAFEGUARDED WAIVER AUTHORIZATION)
     // --------------------------------------------------------------------------
     async function loadAssets() {
         const tbody = document.getElementById('assets-table-body');
@@ -1099,7 +1143,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('penalty-waiver-block').style.display = ['Damaged', 'Lost'].includes(val) ? 'block' : 'none';
     });
 
-    // Department Operators can log returns, but cannot waive
     document.getElementById('form-return-asset').addEventListener('submit', async (e) => {
         e.preventDefault();
         const assetId = document.getElementById('return_asset_id').value;
@@ -1126,7 +1169,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Admin-Only Safeguarded Waiver Modal
     window.openWaiverModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
@@ -1147,7 +1189,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const reason = document.getElementById('waiver_reason').value.trim();
         const enteredPassword = document.getElementById('waiver_admin_password').value;
 
-        // Re-authenticate Admin Dorothy before waiver execution
         const { error: authErr } = await supabase.auth.signInWithPassword({
             email: currentUserEmail,
             password: enteredPassword
@@ -1220,7 +1261,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Create New Item Modal Submit
     document.getElementById('form-create-item').addEventListener('submit', async (e) => {
         e.preventDefault();
         const payload = {
@@ -1250,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 12. DONORS DIRECTORY & SORTING (ADMIN ONLY)
+    // 12. DONORS DIRECTORY
     // --------------------------------------------------------------------------
     function openDonorEditor(donorId = null) {
         document.getElementById('form-donor-editor').reset();
@@ -1507,12 +1547,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 15. MOVEMENT LEDGER (POSTGREST AMBIGUITY FIXED)
+    // 15. MOVEMENT LEDGER (POSTGREST AMBIGUITY FIXED & POSITIVE QUANTITIES)
     // --------------------------------------------------------------------------
     async function loadLedgerRecords() {
         const tbody = document.getElementById('ledger-table-body');
         
-        // Exact Relationship Specified: departments!department_id
         let query = supabase.from('stock_movements')
             .select('*, items(name, unit), departments!department_id(name, dept_code), transfer_dept:departments!transfer_to_dept_id(name)')
             .order('created_at', { ascending: false })
@@ -1563,6 +1602,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tbody.innerHTML = filtered.map(m => {
             const dateStr = new Date(m.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
             const isIn = m.direction === 'In';
+
             return `
                 <tr class="hover:bg-gray-50 border-b">
                     <td class="p-2.5 font-mono font-bold text-gray-700">${m.txn_code || '—'}</td>
@@ -1578,8 +1618,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </td>
                     <td class="p-2.5 font-bold">${m.items?.name || 'Item'}</td>
                     <td class="p-2.5 text-xs text-gray-600">${m.departments?.name || 'Central'}</td>
-                    <td class="p-2.5 font-mono font-bold ${isIn ? 'text-green-700' : 'text-red-700'}">
-                        ${isIn ? '+' : '-'}${m.quantity} ${m.items?.unit || ''}
+                    <td class="p-2.5 font-mono font-bold">
+                        <span class="${isIn ? 'text-emerald-700' : 'text-red-700'}">
+                            ${isIn ? '▲ Inflow' : '▼ Outflow'}: ${Math.abs(m.quantity)} ${m.items?.unit || ''}
+                        </span>
                     </td>
                     <td class="p-2.5 text-xs text-gray-700">
                         ${m.recipient_name ? `<strong>Recipient: ${m.recipient_name}</strong> · ` : ''}

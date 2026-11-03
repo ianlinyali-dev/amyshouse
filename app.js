@@ -135,12 +135,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('nav-btn-accounts').style.display = 'flex';
             document.getElementById('nav-btn-donations').style.display = 'flex';
             document.getElementById('nav-btn-donors').style.display = 'flex';
-            document.getElementById('btn-open-catalog-edit').style.display = 'inline-block';
+            document.getElementById('admin-org-summary-bar').style.display = 'grid';
         } else {
             document.getElementById('nav-btn-accounts').style.display = 'none';
             document.getElementById('nav-btn-donations').style.display = 'none';
             document.getElementById('nav-btn-donors').style.display = 'none';
-            document.getElementById('btn-open-catalog-edit').style.display = isStorekeeper ? 'inline-block' : 'none';
+            document.getElementById('admin-org-summary-bar').style.display = 'none';
         }
 
         setupTabNavigation();
@@ -160,14 +160,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         safeClick('btn-open-asset-modal', () => showModal('modal-new-asset'));
         safeClick('btn-open-new-staff-modal', () => showModal('modal-new-staff'));
         safeClick('btn-open-request-modal', () => showModal('modal-raise-request'));
-        safeClick('btn-open-catalog-edit', () => { renderCatalogEditor(); showModal('modal-catalog-editor'); });
         safeClick('btn-edit-my-profile', () => {
             document.getElementById('my_profile_name').value = currentUserName;
             document.getElementById('my_profile_dept').value = `${currentUserDeptCode} (${currentUserEmail})`;
             showModal('modal-my-profile');
         });
 
-        safeClick('btn-close-catalog-modal', () => hideModal('modal-catalog-editor'));
         safeClick('btn-cancel-donor-modal', () => hideModal('modal-donor-editor'));
         safeClick('btn-cancel-profile-modal', () => hideModal('modal-my-profile'));
         safeClick('btn-cancel-item-modal', () => hideModal('modal-new-item'));
@@ -197,13 +195,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // Add Row to Multi-Item Batch Table
         safeClick('btn-add-batch-row', addBatchRow);
-
-        // Submit Multi-Item Batch
         safeClick('btn-submit-batch-distribution', submitBatchDistribution);
 
-        // Add Row to Requisition Modal
         safeClick('btn-add-req-row', () => {
             const container = document.getElementById('req-items-container');
             const row = document.createElement('div');
@@ -219,7 +213,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             container.appendChild(row);
         });
 
-        // Toggle Action Centre Drawer
         safeClick('btn-toggle-action-centre', () => {
             const drawer = document.getElementById('action-centre-drawer');
             const isHidden = drawer.classList.contains('hidden');
@@ -405,11 +398,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const filterLedgerDept = document.getElementById('filter-ledger-dept');
         const filterAssetsDept = document.getElementById('filter-assets-dept');
 
-        // Central Store is the universal physical hub
         const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
         const storeDeptId = storeDept ? storeDept.id : '';
 
-        // Destination departments (exclude central store itself)
         const recipientDeptOptions = '<option value="">Select Destination Department...</option>' + 
             cachedDepts.filter(d => d.dept_code !== 'ST001').map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
 
@@ -417,7 +408,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (batchDestSelect) batchDestSelect.innerHTML = recipientDeptOptions;
 
         if (currentUserDeptCode === 'AD001' || currentUserDeptCode === 'ST001') {
-            // Admin & Storekeeper manage Central Store by default
             deptSelect.innerHTML = `<option value="${storeDeptId}">Central Store (Main Warehouse)</option>` + 
                 cachedDepts.filter(d => d.dept_code !== 'ST001').map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
             deptSelect.disabled = false;
@@ -432,7 +422,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             filterLedgerDept.innerHTML = filterOptions;
             filterAssetsDept.innerHTML = filterOptions;
         } else {
-            // Department Operators restricted to own department
             const myDept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
             if (myDept) {
                 deptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
@@ -464,7 +453,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         donorsDatalist.innerHTML = cachedDonors.map(dn => `<option data-id="${dn.id}" value="[${dn.donor_code || 'DNR'}] ${dn.name}"></option>`).join('');
     }
 
-    // Connect Combobox inputs to hidden UUID values
     document.getElementById('item_search_input').addEventListener('input', (e) => {
         const val = e.target.value.trim();
         const matched = cachedItems.find(i => `${i.name} (${i.unit})`.toLowerCase() === val.toLowerCase() || i.name.toLowerCase() === val.toLowerCase());
@@ -584,7 +572,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const reasonText = document.getElementById('reason').value.trim();
         const recipientName = document.getElementById('recipient_name').value.trim();
 
-        // Check Balance on Out Movements
         if (direction === 'Out') {
             const { data: balanceCheck } = await supabase
                 .from('current_stock_balances')
@@ -633,7 +620,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { error } = await supabase.from('stock_movements').insert([payload]);
             if (error) throw error;
 
-            // Inter-Department Transfer: add to destination department
             if (isTransfer) {
                 const destinationPayload = {
                     item_id: itemId,
@@ -689,7 +675,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
         tbody.appendChild(tr);
 
-        // Wire availability lookup when item selected
         const input = tr.querySelector('.batch-item-input');
         input.addEventListener('input', (e) => {
             const val = e.target.value.trim().toLowerCase();
@@ -741,7 +726,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            // Outflow from Central Store
             movementsToInsert.push({
                 item_id: itemId,
                 department_id: storeDeptId,
@@ -757,7 +741,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 performed_by_dept: currentUserDeptCode
             });
 
-            // Inflow into Destination Department
             movementsToInsert.push({
                 item_id: itemId,
                 department_id: destDeptId,
@@ -786,7 +769,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('batch_recipient_name').value = '';
             window.updateBatchCount();
 
-            // Switch back to single movement
             document.getElementById('btn-toggle-multi-item').click();
             await loadMasterMetadata();
             refreshAllViews();
@@ -839,7 +821,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data: requestRec, error: reqError } = await supabase.from('stock_requests').insert([requestPayload]).select().single();
         if (reqError) return alert('Error creating requisition: ' + reqError.message);
 
-        // Insert items
         const itemPayloads = itemsToRequest.map(item => ({
             request_id: requestRec.id,
             item_id: item.item_id,
@@ -912,7 +893,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
-    // 1-Click Requisition Fulfillment
     window.fulfillRequisition = async (reqId) => {
         const req = cachedRequests.find(r => r.id === reqId);
         if (!req) return;
@@ -926,7 +906,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const movementsToInsert = [];
 
         for (const it of req.stock_request_items) {
-            // Out from Central Store
             movementsToInsert.push({
                 item_id: it.item_id,
                 department_id: storeDeptId,
@@ -941,7 +920,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 performed_by_dept: currentUserDeptCode
             });
 
-            // In to Receiving Department
             movementsToInsert.push({
                 item_id: it.item_id,
                 department_id: req.requesting_dept_id,
@@ -959,7 +937,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { error: moveErr } = await supabase.from('stock_movements').insert(movementsToInsert);
         if (moveErr) return alert('Error generating fulfillment movements: ' + moveErr.message);
 
-        // Mark requisition as fulfilled
         await supabase.from('stock_requests').update({ status: 'Fulfilled' }).eq('id', reqId);
 
         alert(`Requisition ${req.request_code} fulfilled successfully! Stock balances updated.`);
@@ -975,7 +952,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --------------------------------------------------------------------------
-    // 10. ASSET REGISTER: ISSUE, RETURN & PENALTY WORKFLOW
+    // 10. ASSET REGISTER (SAFEGUARDED ADMIN WAIVER AUTHORIZATION)
     // --------------------------------------------------------------------------
     async function loadAssets() {
         const tbody = document.getElementById('assets-table-body');
@@ -1035,8 +1012,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        const isAdmin = currentUserDeptCode === 'AD001';
+
         tbody.innerHTML = filtered.map(a => {
             const isIssued = a.status === 'Issued Out';
+            const hasPendingPenalty = a.penalty_status === 'Penalty Pending';
 
             return `
                 <tr class="hover:bg-gray-50 border-b">
@@ -1056,12 +1036,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="p-2.5"><span class="px-2 py-0.5 rounded text-xs bg-gray-100">${a.condition}</span></td>
                     <td class="p-2.5 text-xs font-mono text-gray-500">${a.tag_or_serial || '—'}</td>
                     <td class="p-2.5 text-xs">
-                        ${a.penalty_status !== 'None' ? `<span class="text-red-700 font-bold">${a.penalty_status}</span>: KES ${a.penalty_amount || 0}` : '<span class="text-gray-400">—</span>'}
+                        ${a.penalty_status !== 'None' ? `
+                            <span class="text-red-700 font-bold">${a.penalty_status}</span>: KES ${a.penalty_amount || 0}
+                            ${a.waived_by_name ? `<span class="text-gray-500 block text-[10px]">Waived by ${a.waived_by_name}: ${a.waiver_notes || ''}</span>` : ''}
+                        ` : '<span class="text-gray-400">—</span>'}
                     </td>
                     <td class="p-2.5 text-right space-x-1">
                         ${a.status === 'In Store' ? 
                             `<button onclick="window.openIssueModal('${a.id}')" class="text-xs bg-[#0b3b2c] hover:bg-[#07281c] text-white px-2 py-1 rounded">Issue Out</button>` : 
-                            `<button onclick="window.openReturnModal('${a.id}')" class="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded font-semibold">Process Return</button>`
+                            isIssued ? `<button onclick="window.openReturnModal('${a.id}')" class="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded font-semibold">Process Return</button>` :
+                            isAdmin && hasPendingPenalty ? `<button onclick="window.openWaiverModal('${a.id}')" class="text-xs bg-red-700 hover:bg-red-800 text-white font-bold px-2 py-1 rounded">Review / Waive</button>` :
+                            '<span class="text-gray-400 text-xs">—</span>'
                         }
                     </td>
                 </tr>
@@ -1114,6 +1099,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('penalty-waiver-block').style.display = ['Damaged', 'Lost'].includes(val) ? 'block' : 'none';
     });
 
+    // Department Operators can log returns, but cannot waive
     document.getElementById('form-return-asset').addEventListener('submit', async (e) => {
         e.preventDefault();
         const assetId = document.getElementById('return_asset_id').value;
@@ -1125,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return_condition: condition,
             return_date: document.getElementById('return_date').value,
             issued_to: isFaulty ? document.getElementById('return_asset_name').value : null,
-            penalty_status: isFaulty ? document.getElementById('return_penalty_status').value : 'None',
+            penalty_status: isFaulty ? 'Penalty Pending' : 'None',
             penalty_amount: isFaulty ? parseFloat(document.getElementById('return_penalty_amount').value) || 0 : 0,
             waiver_notes: isFaulty ? document.getElementById('return_waiver_notes').value.trim() : null
         };
@@ -1134,15 +1120,107 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error) {
             alert('Error recording return: ' + error.message);
         } else {
-            alert('Asset return processed and status updated in inventory.');
+            alert(isFaulty ? 'Asset marked as damaged/lost. Liability is flagged for Admin Dorothy to review.' : 'Asset returned and cleared back into store inventory.');
             hideModal('modal-return-asset');
             loadAssets();
         }
     });
 
+    // Admin-Only Safeguarded Waiver Modal
+    window.openWaiverModal = (assetId) => {
+        const asset = cachedAssets.find(a => a.id === assetId);
+        if (!asset) return;
+
+        document.getElementById('waiver_asset_id').value = asset.id;
+        document.getElementById('waiver_asset_name').value = `${asset.item_name} [${asset.tag_or_serial || 'No Tag'}]`;
+        document.getElementById('waiver_penalty_amount').value = asset.penalty_amount || 0;
+        document.getElementById('waiver_admin_password').value = '';
+        document.getElementById('waiver_reason').value = '';
+
+        showModal('modal-admin-waiver');
+    };
+
+    document.getElementById('form-admin-waiver').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const assetId = document.getElementById('waiver_asset_id').value;
+        const reason = document.getElementById('waiver_reason').value.trim();
+        const enteredPassword = document.getElementById('waiver_admin_password').value;
+
+        // Re-authenticate Admin Dorothy before waiver execution
+        const { error: authErr } = await supabase.auth.signInWithPassword({
+            email: currentUserEmail,
+            password: enteredPassword
+        });
+
+        if (authErr) {
+            alert('Authorization Failed: Invalid Admin Password. Waiver not executed.');
+            return;
+        }
+
+        const payload = {
+            penalty_status: 'Waived by Admin',
+            waiver_notes: reason,
+            waived_by_name: currentUserName,
+            waived_by_email: currentUserEmail,
+            waived_at: new Date().toISOString()
+        };
+
+        const { error: updateErr } = await supabase.from('assets').update(payload).eq('id', assetId);
+        if (updateErr) {
+            alert('Error applying waiver: ' + updateErr.message);
+        } else {
+            alert('Waiver officially authorized and logged in the audit trail.');
+            hideModal('modal-admin-waiver');
+            loadAssets();
+        }
+    });
+
     // --------------------------------------------------------------------------
-    // 11. ITEM, DONOR & PROFILE SUBMISSIONS
+    // 11. ITEM MASTER & QUICK PRICE EDITOR (ADMIN ONLY)
     // --------------------------------------------------------------------------
+    window.openQuickEditItem = (itemId) => {
+        const item = cachedItems.find(i => i.id === itemId);
+        if (!item) return;
+
+        document.getElementById('edit_item_id').value = item.id;
+        document.getElementById('edit_item_name').value = item.name;
+        document.getElementById('edit_item_unit').value = item.unit;
+        document.getElementById('edit_item_category').value = item.category;
+        document.getElementById('edit_item_cost').value = item.last_purchase_price || item.standard_cost || 0;
+        document.getElementById('edit_item_reorder').value = item.reorder_level || 5;
+        document.getElementById('edit_item_perishable').checked = !!item.is_perishable;
+
+        showModal('modal-quick-edit-item');
+    };
+
+    document.getElementById('form-quick-edit-item').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const itemId = document.getElementById('edit_item_id').value;
+        const cost = parseFloat(document.getElementById('edit_item_cost').value) || 0;
+
+        const payload = {
+            name: document.getElementById('edit_item_name').value.trim(),
+            unit: document.getElementById('edit_item_unit').value.trim(),
+            category: document.getElementById('edit_item_category').value,
+            standard_cost: cost,
+            last_purchase_price: cost,
+            reorder_level: parseFloat(document.getElementById('edit_item_reorder').value) || 5,
+            is_perishable: document.getElementById('edit_item_perishable').checked
+        };
+
+        const { error } = await supabase.from('items').update(payload).eq('id', itemId);
+        if (error) {
+            alert('Error updating commodity: ' + error.message);
+        } else {
+            alert('Item amendments and price updated successfully across the system!');
+            hideModal('modal-quick-edit-item');
+            await loadMasterMetadata();
+            refreshAllViews();
+        }
+    });
+
+    // Create New Item Modal Submit
     document.getElementById('form-create-item').addEventListener('submit', async (e) => {
         e.preventDefault();
         const payload = {
@@ -1168,36 +1246,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 document.getElementById('item_search_input').value = `${data.name} (${data.unit})`;
                 document.getElementById('item_id').value = data.id;
             }
-        }
-    });
-
-    document.getElementById('form-create-asset').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const deptId = toValidUUID(document.getElementById('asset_dept_id').value);
-        if (!deptId) return alert('Please select a department for this asset.');
-
-        const payload = {
-            item_name: document.getElementById('asset_name').value.trim(),
-            department_id: deptId,
-            acquisition_type: document.getElementById('asset_acq_type').value,
-            condition: document.getElementById('asset_condition').value,
-            cost_or_value: parseFloat(document.getElementById('asset_cost').value) || 0,
-            storage_location: document.getElementById('asset_location').value.trim(),
-            custodian: document.getElementById('asset_custodian').value.trim(),
-            tag_or_serial: document.getElementById('asset_tag').value.trim(),
-            status: 'In Store',
-            performed_by_name: currentUserName,
-            performed_by_email: currentUserEmail
-        };
-
-        const { error } = await supabase.from('assets').insert([payload]);
-        if (error) {
-            alert('Error saving asset: ' + error.message);
-        } else {
-            alert('Durable asset recorded successfully in store inventory!');
-            document.getElementById('form-create-asset').reset();
-            hideModal('modal-new-asset');
-            loadAssets();
         }
     });
 
@@ -1367,45 +1415,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 14. CATALOG & PRICING EDITOR
-    // --------------------------------------------------------------------------
-    function renderCatalogEditor() {
-        const tbody = document.getElementById('catalog-editor-table-body');
-        tbody.innerHTML = cachedItems.map(item => `
-            <tr class="hover:bg-gray-50 border-b">
-                <td class="p-2 font-bold text-[#0b3b2c]">${item.name}</td>
-                <td class="p-2"><input type="text" id="cat-unit-${item.id}" value="${item.unit}" class="w-16 p-1 border rounded text-xs"></td>
-                <td class="p-2"><input type="number" id="cat-price-${item.id}" value="${item.standard_cost || 0}" step="0.5" class="w-20 p-1 border rounded text-xs font-mono"></td>
-                <td class="p-2"><input type="number" id="cat-reorder-${item.id}" value="${item.reorder_level || 5}" step="1" class="w-16 p-1 border rounded text-xs font-mono"></td>
-                <td class="p-2 text-center"><input type="checkbox" id="cat-perish-${item.id}" ${item.is_perishable ? 'checked' : ''} class="rounded text-[#0b3b2c]"></td>
-                <td class="p-2 text-right">
-                    <button onclick="window.saveCatalogItem('${item.id}')" class="bg-[#0b3b2c] hover:bg-[#07281c] text-white px-2 py-1 rounded text-xs font-semibold">Save</button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    window.saveCatalogItem = async (itemId) => {
-        const payload = {
-            unit: document.getElementById(`cat-unit-${itemId}`).value.trim(),
-            standard_cost: parseFloat(document.getElementById(`cat-price-${itemId}`).value) || 0,
-            last_purchase_price: parseFloat(document.getElementById(`cat-price-${itemId}`).value) || 0,
-            reorder_level: parseFloat(document.getElementById(`cat-reorder-${itemId}`).value) || 0,
-            is_perishable: document.getElementById(`cat-perish-${itemId}`).checked
-        };
-
-        const { error } = await supabase.from('items').update(payload).eq('id', itemId);
-        if (error) {
-            alert('Error updating item: ' + error.message);
-        } else {
-            alert('Item details and pricing updated successfully!');
-            await loadMasterMetadata();
-            refreshAllViews();
-        }
-    };
-
-    // --------------------------------------------------------------------------
-    // 15. STOCK BALANCES & MOVEMENT LEDGER
+    // 14. CENTRAL BALANCES & ORGANIZATION INVENTORY VIEW
     // --------------------------------------------------------------------------
     async function loadStockBalances() {
         const tbody = document.getElementById('balances-table-body');
@@ -1413,17 +1423,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             query = query.eq('dept_code', currentUserDeptCode);
-            document.getElementById('stock-scope-desc').textContent = `Showing items earmarked exclusively for [${currentUserDeptCode}]`;
+            document.getElementById('stock-scope-desc').textContent = `Showing commodities allocated exclusively to [${currentUserDeptCode}]`;
         }
 
         const { data, error } = await query;
         if (error) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
             return;
         }
 
         cachedBalances = data || [];
+        updateOrganizationValuation();
         renderStockBalancesTable();
+    }
+
+    async function updateOrganizationValuation() {
+        if (currentUserDeptCode !== 'AD001') return;
+
+        const { data: orgData } = await supabase.from('master_inventory_summary_view').select('*');
+        if (!orgData) return;
+
+        const totalItems = orgData.length;
+        const centralTotal = orgData.reduce((sum, i) => sum + Number(i.central_store_stock), 0);
+        const deptTotal = orgData.reduce((sum, i) => sum + Number(i.departments_stock), 0);
+        const totalValuation = orgData.reduce((sum, i) => sum + Number(i.total_valuation_kes), 0);
+
+        document.getElementById('counter-total-items').textContent = totalItems;
+        document.getElementById('counter-central-stock').textContent = centralTotal.toFixed(1);
+        document.getElementById('counter-dept-stock').textContent = deptTotal.toFixed(1);
+        document.getElementById('counter-total-valuation').textContent = `KES ${totalValuation.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
     }
 
     function renderStockBalancesTable() {
@@ -1444,12 +1472,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center p-6 text-gray-400">No stock balances match criteria.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-gray-400">No stock commodities match criteria.</td></tr>';
             return;
         }
 
+        const isAdmin = currentUserDeptCode === 'AD001';
+
         tbody.innerHTML = filtered.map(r => {
             const isLow = r.balance <= r.reorder_level;
+            const unitPrice = Number(r.standard_cost || 0);
+            const totalValuation = Number(r.balance * unitPrice);
+
             return `
                 <tr class="hover:bg-gray-50 border-b">
                     <td class="p-3 font-semibold text-gray-900">${r.item_name}</td>
@@ -1458,24 +1491,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="p-3 font-mono font-bold text-sm ${isLow ? 'text-red-600' : 'text-[#0b3b2c]'}">
                         ${Number(r.balance).toFixed(2)} <span class="text-xs font-normal text-gray-500">${r.unit}</span>
                     </td>
-                    <td class="p-3 font-mono text-xs text-gray-700">KES ${Number(r.standard_cost || 0).toFixed(2)}</td>
+                    <td class="p-3 font-mono text-xs text-gray-700">KES ${unitPrice.toFixed(2)}</td>
+                    <td class="p-3 font-mono text-xs font-bold text-gray-800">KES ${totalValuation.toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
                     <td class="p-3">
                         <span class="px-2 py-0.5 rounded text-xs font-semibold ${isLow ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
                             ${isLow ? '⚠️ Low Stock' : '✓ Healthy'}
                         </span>
                     </td>
                     <td class="p-3 text-right">
-                        ${r.is_perishable ? '<span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-900 font-semibold">Perishable</span>' : '<span class="text-gray-400 text-xs">—</span>'}
+                        ${isAdmin ? `<button onclick="window.openQuickEditItem('${r.item_id}')" class="text-xs bg-gray-100 hover:bg-emerald-100 text-[#0b3b2c] font-bold px-2 py-1 rounded transition">✏️ Edit</button>` : '<span class="text-gray-400 text-xs">—</span>'}
                     </td>
                 </tr>
             `;
         }).join('');
     }
 
+    // --------------------------------------------------------------------------
+    // 15. MOVEMENT LEDGER (POSTGREST AMBIGUITY FIXED)
+    // --------------------------------------------------------------------------
     async function loadLedgerRecords() {
         const tbody = document.getElementById('ledger-table-body');
+        
+        // Exact Relationship Specified: departments!department_id
         let query = supabase.from('stock_movements')
-            .select('*, items(name, unit), departments(name, dept_code)')
+            .select('*, items(name, unit), departments!department_id(name, dept_code), transfer_dept:departments!transfer_to_dept_id(name)')
             .order('created_at', { ascending: false })
             .limit(150);
 
@@ -1486,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { data, error } = await query;
         if (error) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-500">Error loading ledger: ${error.message}</td></tr>`;
             return;
         }
 
@@ -1712,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 16. FILTERS & EVENT LISTENERS
     // --------------------------------------------------------------------------
     function setupFilters() {
-        ['filter-stock-search', 'filter-stock-dept', 'filter-stock-category', 'filter-stock-health'].forEach(id => {
+        ['filter-stock-search', 'filter-stock-category', 'filter-stock-dept', 'filter-stock-health'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.addEventListener('input', renderStockBalancesTable);
         });
@@ -1789,15 +1828,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data } = await supabase.from('current_stock_balances').select('*');
         if (!data || !data.length) return alert('No stock data to export.');
 
-        let csv = 'Item Name,Category,Storage Location,Balance,Unit,Reorder Level,Current Price\n';
+        let csv = 'Item Name,Category,Storage Location,Balance,Unit,Reorder Level,Unit Cost,Valuation (KES)\n';
         data.forEach(r => {
-            csv += `"${r.item_name}","${r.category}","${r.department_name}",${r.balance},"${r.unit}",${r.reorder_level},${r.standard_cost}\n`;
+            const unitCost = Number(r.standard_cost || 0);
+            const val = Number(r.balance * unitCost);
+            csv += `"${r.item_name}","${r.category}","${r.department_name}",${r.balance},"${r.unit}",${r.reorder_level},${unitCost},${val}\n`;
         });
         downloadCSV(csv, `Amys_House_Stock_Balances_${new Date().toISOString().slice(0,10)}.csv`);
     });
 
     document.getElementById('btn-export-ledger').addEventListener('click', async () => {
-        const { data } = await supabase.from('stock_movements').select('*, items(name, unit), departments(name)');
+        const { data } = await supabase.from('stock_movements').select('*, items(name, unit), departments!department_id(name)');
         if (!data || !data.length) return alert('No movements to export.');
 
         let csv = 'Txn Code,Timestamp,Movement Type,Direction,Item,Quantity,Unit,Department,Recipient / Purpose,Reason,Operator Name,Operator Account\n';
@@ -1823,9 +1864,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data } = await supabase.from('assets').select('*, departments(name)');
         if (!data || !data.length) return alert('No assets to export.');
 
-        let csv = 'Asset Name,Department,Status,Custodian,Issued To,Issued Date,Return Condition,Penalty Status,Penalty Amount (KES),Serial Tag\n';
+        let csv = 'Asset Name,Department,Status,Custodian,Issued To,Issued Date,Return Condition,Penalty Status,Penalty Amount (KES),Serial Tag,Waived By,Waiver Notes\n';
         data.forEach(a => {
-            csv += `"${a.item_name}","${a.departments?.name}","${a.status}","${a.custodian}","${a.issued_to || ''}","${a.issued_date || ''}","${a.return_condition || ''}","${a.penalty_status}","${a.penalty_amount}","${a.tag_or_serial || ''}"\n`;
+            csv += `"${a.item_name}","${a.departments?.name}","${a.status}","${a.custodian}","${a.issued_to || ''}","${a.issued_date || ''}","${a.return_condition || ''}","${a.penalty_status}","${a.penalty_amount}","${a.tag_or_serial || ''}","${a.waived_by_name || ''}","${a.waiver_notes || ''}"\n`;
         });
         downloadCSV(csv, `Amys_House_Assets_${new Date().toISOString().slice(0,10)}.csv`);
     });

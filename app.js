@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 3. ACTION CENTRE ALERTS
+    // 3. ACTION CENTRE ALERTS (AUTO-REMOVAL ON FULFILLMENT)
     // --------------------------------------------------------------------------
     async function loadActionCentre() {
         const panel = document.getElementById('action-centre-panel');
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const list = filterType === 'ALL' ? cachedAlerts : cachedAlerts.filter(a => a.alert_type === filterType);
 
         if (!list.length) {
-            container.innerHTML = '<div class="py-4 text-center text-gray-400">No alerts in this category.</div>';
+            container.innerHTML = '<div class="py-4 text-center text-gray-400">No active alerts in this category.</div>';
             return;
         }
 
@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 5. MASTER DATA LOADER (AH001 INCLUDED, AD001 EXCLUDED FROM STOREROOMS)
+    // 5. MASTER DATA LOADER
     // --------------------------------------------------------------------------
     async function loadMasterMetadata() {
         try {
@@ -407,10 +407,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const storeDept = cachedDepts.find(d => d.dept_code === 'ST001');
         const storeDeptId = storeDept ? storeDept.id : '';
 
-        // Real storage departments: Excludes supervisory AD001, includes AH001 (Amy's House)
+        // Actual storage departments (Excludes supervisory AD001, includes AH001)
         const actualStorageDepts = cachedDepts.filter(d => d.dept_code !== 'AD001');
 
-        // Recipient departments for transfers (all departments except Central Store and AD001)
         const recipientDeptOptions = '<option value="">Select Destination Department...</option>' + 
             actualStorageDepts.filter(d => d.dept_code !== 'ST001')
                               .map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
@@ -419,7 +418,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (batchDestSelect) batchDestSelect.innerHTML = recipientDeptOptions;
 
         if (currentUserDeptCode === 'AD001' || currentUserDeptCode === 'ST001') {
-            // Admin Dorothy & Storekeeper Edward oversee Central Store by default
             deptSelect.innerHTML = `<option value="${storeDeptId}">Central Store (Main Warehouse)</option>` + 
                 actualStorageDepts.filter(d => d.dept_code !== 'ST001')
                                   .map(d => `<option value="${d.id}">${d.name} (${d.dept_code})</option>`).join('');
@@ -435,7 +433,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             filterLedgerDept.innerHTML = filterOptions;
             filterAssetsDept.innerHTML = filterOptions;
         } else {
-            // Department Operators (e.g. Dotty for AH001, Paul for FC001)
             const myDept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
             if (myDept) {
                 deptSelect.innerHTML = `<option value="${myDept.id}">${myDept.name} (${myDept.dept_code})</option>`;
@@ -464,7 +461,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         itemsDatalist.innerHTML = cachedItems.map(i => `<option data-id="${i.id}" value="${i.name} (${i.unit})"></option>`).join('');
 
         const donorsDatalist = document.getElementById('donors-datalist');
-        donorsDatalist.innerHTML = cachedDonors.map(dn => `<option data-id="${dn.id}" value="[${dn.donor_code || 'DNR'}] ${dn.name}"></option>`).join('');
+        donorsDatalist.innerHTML = cachedDonors.map(dn => `<option data-id="${dn.id || dn.donor_id}" value="[${dn.donor_code || 'DNR'}] ${dn.name || dn.donor_name}"></option>`).join('');
     }
 
     document.getElementById('item_search_input').addEventListener('input', (e) => {
@@ -486,15 +483,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('donor_search_input').addEventListener('input', (e) => {
         const val = e.target.value.trim().toLowerCase();
-        const matched = cachedDonors.find(dn => 
-            `[${dn.donor_code || 'DNR'}] ${dn.name}`.toLowerCase() === val || 
-            dn.name.toLowerCase() === val ||
-            (dn.donor_code && dn.donor_code.toLowerCase() === val)
-        );
+        const matched = cachedDonors.find(dn => {
+            const name = (dn.name || dn.donor_name || '').toLowerCase();
+            const code = (dn.donor_code || '').toLowerCase();
+            return `[${code}] ${name}` === val || name === val || code === val;
+        });
         const infoDiv = document.getElementById('donor-quick-info');
 
         if (matched) {
-            document.getElementById('donor_id').value = matched.id;
+            document.getElementById('donor_id').value = matched.id || matched.donor_id;
             infoDiv.textContent = `Code: ${matched.donor_code} | Phone: ${matched.phone_number || 'N/A'}`;
         } else {
             document.getElementById('donor_id').value = '';
@@ -503,7 +500,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 6. AUTO DONATION REF GENERATION (AH/DR/... FOR AMY'S HOUSE)
+    // 6. AUTO DONATION REF GENERATION
     // --------------------------------------------------------------------------
     async function checkAndGenerateDonationRef() {
         const moveType = document.getElementById('movement_type').value;
@@ -549,7 +546,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 7. RECORD SINGLE STOCK MOVEMENT (STRICT NO-NEGATIVE BLOCK)
+    // 7. RECORD SINGLE STOCK MOVEMENT
     // --------------------------------------------------------------------------
     document.getElementById('movement-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -587,7 +584,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const reasonText = document.getElementById('reason').value.trim();
         const recipientName = document.getElementById('recipient_name').value.trim();
 
-        // STRICT NO-NEGATIVE STOCK CHECK: NO BYPASS ALLOWED
         if (direction === 'Out') {
             const { data: balanceCheck } = await supabase
                 .from('current_stock_balances')
@@ -610,7 +606,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="text-red-700 font-bold">Deficit: -${deficit} ${itemUnit}</div>
                 `;
                 showModal('modal-stock-blocked');
-                return; // HARD STOP: Prevents form submission
+                return;
             }
         }
 
@@ -815,7 +811,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 9. REQUISITION & REQUESTS PIPELINE
+    // 9. REQUISITION & REQUESTS PIPELINE (FIXED CHECK CONSTRAINT HANDLING)
     // --------------------------------------------------------------------------
     document.getElementById('form-raise-request').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -927,6 +923,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
+    // Fulfill Requisition: Fixed to match constraint and auto-remove alert
     window.fulfillRequisition = async (reqId) => {
         const req = cachedRequests.find(r => r.id === reqId);
         if (!req) return;
@@ -938,7 +935,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const balanceRec = cachedBalances.find(b => b.item_id === it.item_id && b.dept_code === 'ST001');
             const available = balanceRec ? Number(balanceRec.balance) : 0;
             if (it.quantity_requested > available) {
-                alert(`Cannot fulfill requisition: Insufficient stock for ${it.items?.name}. Requested: ${it.quantity_requested}, Available in Central Store: ${available}. Please restock first.`);
+                alert(`Cannot fulfill: Insufficient stock for ${it.items?.name}. Requested: ${it.quantity_requested}, Available in Central Store: ${available}. Please restock first.`);
                 return;
             }
         }
@@ -978,13 +975,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
+        // Insert movements
         const { error: moveErr } = await supabase.from('stock_movements').insert(movementsToInsert);
-        if (moveErr) return alert('Error generating fulfillment movements: ' + moveErr.message);
+        if (moveErr) {
+            alert('Error generating fulfillment movements: ' + moveErr.message);
+            return;
+        }
 
+        // Mark requisition as Fulfilled (Clears alert automatically from Action Centre)
         await supabase.from('stock_requests').update({ status: 'Fulfilled' }).eq('id', reqId);
 
-        alert(`Requisition ${req.request_code} fulfilled successfully! Stock balances updated.`);
+        alert(`Requisition ${req.request_code} fulfilled successfully! Action Centre alert cleared.`);
         loadRequisitions();
+        loadActionCentre();
         refreshAllViews();
     };
 
@@ -996,12 +999,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --------------------------------------------------------------------------
-    // 10. ASSET REGISTER (SAFEGUARDED WAIVER AUTHORIZATION)
+    // 10. ASSET REGISTER (DEPARTMENT OPERATORS CAN ISSUE & RETURN THEIR ASSETS)
     // --------------------------------------------------------------------------
     async function loadAssets() {
         const tbody = document.getElementById('assets-table-body');
         let query = supabase.from('assets').select('*, departments(name, dept_code)').order('created_at', { ascending: false });
 
+        // Scoped for department officers
         if (currentUserDeptCode !== 'AD001' && currentUserDeptCode !== 'ST001') {
             const dept = cachedDepts.find(d => d.dept_code === currentUserDeptCode);
             if (dept) query = query.eq('department_id', dept.id);
@@ -1098,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
+    // Departments can issue their own assets
     window.openIssueModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
@@ -1127,6 +1132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // Departments can process returns of their own assets
     window.openReturnModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
@@ -1169,6 +1175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // Admin-Only Safeguarded Waiver
     window.openWaiverModal = (assetId) => {
         const asset = cachedAssets.find(a => a.id === assetId);
         if (!asset) return;
@@ -1218,7 +1225,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 11. ITEM MASTER & QUICK PRICE EDITOR (ADMIN ONLY)
+    // 11. ITEM MASTER & QUICK PRICE EDITOR
     // --------------------------------------------------------------------------
     window.openQuickEditItem = (itemId) => {
         const item = cachedItems.find(i => i.id === itemId);
@@ -1290,16 +1297,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 12. DONORS DIRECTORY
+    // 12. DONORS DIRECTORY & EDITING (FIXED FIELD MAPPING & RLS)
     // --------------------------------------------------------------------------
     function openDonorEditor(donorId = null) {
         document.getElementById('form-donor-editor').reset();
         document.getElementById('edit_donor_id').value = donorId || '';
 
         if (donorId) {
-            const d = cachedDonors.find(donor => donor.id === donorId);
+            // Check both donor_id and id to handle summary view mapping
+            const d = cachedDonors.find(donor => (donor.donor_id === donorId || donor.id === donorId));
             if (d) {
-                document.getElementById('donor_full_name').value = d.name;
+                document.getElementById('donor_full_name').value = d.donor_name || d.name || '';
                 document.getElementById('donor_phone_number').value = d.phone_number || '';
                 document.getElementById('donor_contact_info').value = d.contact_info || '';
                 document.getElementById('modal-donor-title').textContent = 'Edit Donor Details';
@@ -1329,7 +1337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (result.error) {
             alert('Error saving donor: ' + result.error.message);
         } else {
-            alert('Donor profile saved successfully!');
+            alert('Donor profile updated successfully in the registry!');
             hideModal('modal-donor-editor');
             await loadMasterMetadata();
             loadDonorsDirectory();
@@ -1362,10 +1370,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const sortBy = document.getElementById('sort-donor-activity').value;
 
         let filtered = cachedDonors.filter(d => {
-            return !search || 
-                (d.donor_code && d.donor_code.toLowerCase().includes(search)) ||
-                (d.donor_name && d.donor_name.toLowerCase().includes(search)) ||
-                (d.phone_number && d.phone_number.toLowerCase().includes(search));
+            const name = (d.donor_name || d.name || '').toLowerCase();
+            const code = (d.donor_code || '').toLowerCase();
+            const phone = (d.phone_number || '').toLowerCase();
+            return !search || code.includes(search) || name.includes(search) || phone.includes(search);
         });
 
         filtered.sort((a, b) => {
@@ -1374,7 +1382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (sortBy === 'LATEST_FIRST') return dateB - dateA;
             if (sortBy === 'OLDEST_FIRST') return dateA - dateB;
-            if (sortBy === 'NAME_ASC') return a.donor_name.localeCompare(b.donor_name);
+            if (sortBy === 'NAME_ASC') return (a.donor_name || a.name || '').localeCompare(b.donor_name || b.name || '');
             return 0;
         });
 
@@ -1388,16 +1396,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ? new Date(d.last_donation_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) 
                 : '<span class="text-gray-400">No donations yet</span>';
 
+            const donorIdVal = d.donor_id || d.id;
+
             return `
                 <tr class="hover:bg-gray-50 border-b">
                     <td class="p-2.5 font-mono font-bold text-[#0b3b2c]">${d.donor_code || 'DNR'}</td>
-                    <td class="p-2.5 font-bold text-gray-900">${d.donor_name}</td>
+                    <td class="p-2.5 font-bold text-gray-900">${d.donor_name || d.name}</td>
                     <td class="p-2.5 font-mono text-gray-700">${d.phone_number || '—'}</td>
                     <td class="p-2.5 text-gray-500">${d.contact_info || '—'}</td>
                     <td class="p-2.5 font-medium text-emerald-800">${lastDate}</td>
                     <td class="p-2.5 font-mono font-bold text-center">${d.total_donation_instances || 0}</td>
                     <td class="p-2.5 text-right">
-                        <button onclick="window.triggerEditDonor('${d.donor_id}')" class="text-xs bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded text-gray-700 font-semibold">Edit Details</button>
+                        <button onclick="window.triggerEditDonor('${donorIdVal}')" class="text-xs bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded text-gray-700 font-semibold">Edit Details</button>
                     </td>
                 </tr>
             `;
@@ -1547,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 15. MOVEMENT LEDGER (POSTGREST AMBIGUITY FIXED & POSITIVE QUANTITIES)
+    // 15. MOVEMENT LEDGER
     // --------------------------------------------------------------------------
     async function loadLedgerRecords() {
         const tbody = document.getElementById('ledger-table-body');
@@ -1790,7 +1800,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --------------------------------------------------------------------------
-    // 16. FILTERS & EVENT LISTENERS
+    // 16. FILTERS & REFRESH
     // --------------------------------------------------------------------------
     function setupFilters() {
         ['filter-stock-search', 'filter-stock-category', 'filter-stock-dept', 'filter-stock-health'].forEach(id => {
@@ -1829,7 +1839,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --------------------------------------------------------------------------
-    // 17. CSV EXPORT UTILITIES
+    // 17. CSV EXPORTS
     // --------------------------------------------------------------------------
     function downloadCSV(csvContent, fileName) {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1849,7 +1859,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let csv = 'Donor Code,Donor Name,Phone Number,Contact Details,Last Active Donation Date,Total Donations Given\n';
         data.forEach(d => {
-            csv += `"${d.donor_code}","${d.donor_name}","${d.phone_number || ''}","${d.contact_info || ''}","${d.last_donation_date || 'No Donations'}","${d.total_donation_instances}"\n`;
+            csv += `"${d.donor_code}","${d.donor_name || d.name}","${d.phone_number || ''}","${d.contact_info || ''}","${d.last_donation_date || 'No Donations'}","${d.total_donation_instances}"\n`;
         });
         downloadCSV(csv, `Amys_House_Donors_Directory_${new Date().toISOString().slice(0,10)}.csv`);
     });
